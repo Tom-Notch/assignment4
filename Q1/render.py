@@ -1,10 +1,11 @@
+#!/usr/bin/env python3
 import argparse
 import os
 
 import imageio
 import numpy as np
 import torch
-from data_utils import colour_depth_q1_render
+from data_utils import color_depth_q1_render
 from model import Gaussians
 from model import Scene
 from PIL import Image
@@ -58,7 +59,7 @@ def create_renders(args):
             # Rendering scene using gaussian splatting
             ### YOUR CODE HERE ###
             # HINT: Can any function from the Scene class help?
-            # HINT: Set bg_colour to (1.0, 1.0, 1.0)
+            # HINT: Set bg_color to (1.0, 1.0, 1.0)
             # HINT: Get per_splat from args.gaussians_per_splat
             # HINT: img_size and camera are available above
             img, depth, mask = None
@@ -71,11 +72,11 @@ def create_renders(args):
         img = (np.clip(img, 0.0, 1.0) * 255.0).astype(np.uint8)
         mask = np.where(mask > 0.5, 255.0, 0.0).astype(np.uint8)  # (H, W, 3)
 
-        # Colouring the depth map
+        # Coloring the depth map
         depth = depth[:, :, 0].astype(np.float32)  # (H, W)
-        coloured_depth = colour_depth_q1_render(depth)  # (H, W, 3)
+        colored_depth = color_depth_q1_render(depth)  # (H, W, 3)
 
-        concat = np.concatenate([img, coloured_depth, mask], axis=1)
+        concat = np.concatenate([img, colored_depth, mask], axis=1)
         resized = Image.fromarray(concat).resize((256 * 3, 256))
         resized.save(debug_path)
 
@@ -116,7 +117,7 @@ def get_args():
         help=(
             "Number of gaussians to splat in one function call. If set to -1, "
             "then all gaussians in the scene are splat in a single function call. "
-            "If set to any other positive interger, then it determines the number of "
+            "If set to any other positive integer, then it determines the number of "
             "gaussians to splat per function call (the last function call might splat "
             "lesser number of gaussians). In general, the algorithm can run faster "
             "if more gaussians are splat per function call, but at the cost of higher GPU "

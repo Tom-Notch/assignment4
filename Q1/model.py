@@ -1,13 +1,15 @@
+#!/usr/bin/env python3
 import math
 from typing import Optional
 from typing import Tuple
 
 import numpy as np
 import torch
-from data_utils import colours_from_spherical_harmonics
+from data_utils import colors_from_spherical_harmonics
 from data_utils import load_gaussians_from_ply
 from pytorch3d.ops.knn import knn_points
 from pytorch3d.renderer.cameras import PerspectiveCameras
+from pytorch3d.transforms import quaternion_to_matrix
 
 
 class Gaussians:
@@ -71,7 +73,7 @@ class Gaussians:
         self.pre_act_quats = data["pre_act_quats"]
         self.means = data["means"]
         self.pre_act_scales = data["pre_act_scales"]
-        self.colours = data["colours"]
+        self.colors = data["colors"]
         self.pre_act_opacities = data["pre_act_opacities"]
 
         # [Q 1.3.1] NOTE: Uncomment spherical harmonics code for question 1.3.1
@@ -93,7 +95,7 @@ class Gaussians:
         data["pre_act_quats"] = torch.tensor(ply_gaussians["rot"])
         data["pre_act_scales"] = torch.tensor(ply_gaussians["scale"])
         data["pre_act_opacities"] = torch.tensor(ply_gaussians["opacity"]).squeeze()
-        data["colours"] = torch.tensor(ply_gaussians["dc_colours"])
+        data["colors"] = torch.tensor(ply_gaussians["dc_colors"])
 
         # [Q 1.3.1] NOTE: Uncomment spherical harmonics code for question 1.3.1
         # data["spherical_harmonics"] = torch.tensor(ply_gaussians["sh"])
@@ -120,7 +122,7 @@ class Gaussians:
         )  # (N,)
 
         # Initializing colors randomly
-        data["colours"] = torch.rand((len(means), 3), dtype=torch.float32)  # (N, 3)
+        data["colors"] = torch.rand((len(means), 3), dtype=torch.float32)  # (N, 3)
 
         # Initializing quaternions to be the identity quaternion
         quats = torch.zeros((len(means), 4), dtype=torch.float32)  # (N, 4)
@@ -154,7 +156,7 @@ class Gaussians:
         )  # (N,)
 
         # Initializing colors randomly
-        data["colours"] = torch.rand((num_points, 3), dtype=torch.float32)  # (N, 3)
+        data["colors"] = torch.rand((num_points, 3), dtype=torch.float32)  # (N, 3)
 
         # Initializing quaternions to be the identity quaternion
         quats = torch.zeros((num_points, 4), dtype=torch.float32)  # (N, 4)
@@ -210,7 +212,7 @@ class Gaussians:
 
     def check_if_trainable(self):
 
-        attrs = ["means", "pre_act_scales", "colours", "pre_act_opacities"]
+        attrs = ["means", "pre_act_scales", "colors", "pre_act_opacities"]
         if not self.is_isotropic:
             attrs += ["pre_act_quats"]
 
@@ -231,7 +233,7 @@ class Gaussians:
         self.pre_act_quats = self.pre_act_quats.cuda()
         self.means = self.means.cuda()
         self.pre_act_scales = self.pre_act_scales.cuda()
-        self.colours = self.colours.cuda()
+        self.colors = self.colors.cuda()
         self.pre_act_opacities = self.pre_act_opacities.cuda()
 
         # [Q 1.3.1] NOTE: Uncomment spherical harmonics code for question 1.3.1
@@ -261,15 +263,27 @@ class Gaussians:
         # HINT: Are quats ever used or optimized for isotropic gaussians? What will their value be?
         # Based on your answers, can you write a more efficient code for the isotropic case?
         if self.is_isotropic:
-
             ### YOUR CODE HERE ###
-            cov_3D = None  # (N, 3, 3)
+            cov_3D = (scales**2).view(-1, 1, 1) * torch.eye(
+                3,
+                device=scales.device,
+                dtype=scales.dtype,
+            )  # (N, 3, 3)
 
-        # HINT: You can use a function from pytorch3d to convert quaternions to rotation matrices.
         else:
-
+            # HINT: You can use a function from pytorch3d to convert quaternions to rotation matrices.
             ### YOUR CODE HERE ###
-            cov_3D = None  # (N, 3, 3)
+            SST = torch.diag_embed(scales**2).to(
+                device=scales.device,
+                dtype=scales.dtype,
+            )
+
+            # q = (w, x, y, z)
+            # SO(3) = [[1 - 2y^2 - 2z^2, 2xy - 2wz,       2xz + 2wy],
+            #          [2xy + 2wz,       1 - 2x^2 - 2z^2, 2yz - 2wx],
+            #          [2xz - 2wy,       2yz + 2wx,       1 - 2x^2 - 2y^2]]
+            R = quaternion_to_matrix(quats)
+            cov_3D = R @ SST @ R.mT  # (N, 3, 3)
 
         return cov_3D
 
@@ -299,23 +313,29 @@ class Gaussians:
             cov_3D  :   A torch.Tensor of shape (N, 3, 3)
         """
         ### YOUR CODE HERE ###
+        N = means_3D.shape[0]
+
         # HINT: For computing the jacobian J, can you find a function in this file that can help?
-        J = None  # (N, 2, 3)
+        J = self._compute_jacobian(means_3D, camera, img_size)  # (N, 2, 3)
 
         ### YOUR CODE HERE ###
         # HINT: Can you extract the world to camera rotation matrix (W) from one of the inputs
         # of this function?
-        W = None  # (N, 3, 3)
+        W = (
+            camera.get_world_to_view_transform()
+            .get_matrix()[..., :3, :3]
+            .expand(N, 3, 3)
+        )  # (N, 3, 3)
 
         ### YOUR CODE HERE ###
         # HINT: Can you find a function in this file that can help?
-        cov_3D = None  # (N, 3, 3)
+        cov_3D = self.compute_cov_3D(quats, scales)  # (N, 3, 3)
 
         ### YOUR CODE HERE ###
         # HINT: Use the above three variables to compute cov_2D
-        cov_2D = None  # (N, 2, 2)
+        cov_2D = (J @ W @ cov_3D @ W.mT @ J.mT)[..., :2, :2]  # (N, 2, 2)
 
-        # Post processing to make sure that each 2D Gaussian covers atleast approximately 1 pixel
+        # Post processing to make sure that each 2D Gaussian covers at least approximately 1 pixel
         cov_2D[:, 0, 0] += 0.3
         cov_2D[:, 1, 1] += 0.3
 
@@ -338,7 +358,7 @@ class Gaussians:
         ### YOUR CODE HERE ###
         # HINT: Do note that means_2D have units of pixels. Hence, you must apply a
         # transformation that moves points in the world space to screen space.
-        means_2D = None  # (N, 2)
+        means_2D = camera.transform_points_screen(means_3D)[..., :2]  # (N, 2)
         return means_2D
 
     @staticmethod
@@ -390,14 +410,17 @@ class Gaussians:
         """
         ### YOUR CODE HERE ###
         # HINT: Refer to README for a relevant equation
-        power = None  # (N, H*W)
+        x_minus_mu = (points_2D - means_2D).unsqueeze(-1)  # (N, H*W, 2, 1)
+        power = (
+            -0.5 * x_minus_mu.mT @ cov_2D_inverse.unsqueeze(1) @ x_minus_mu
+        )  # (N, H*W, 1, 1)
 
-        return power
+        return power.squeeze()  # (N, H*W)
 
     @staticmethod
     def apply_activations(pre_act_quats, pre_act_scales, pre_act_opacities):
 
-        # Convert logscales to scales
+        # Convert log scales to scales
         scales = torch.exp(pre_act_scales)
 
         # Normalize quaternions
@@ -566,7 +589,7 @@ class Scene:
         z_vals: torch.Tensor,
         quats: torch.Tensor,
         scales: torch.Tensor,
-        colours: torch.Tensor,
+        colors: torch.Tensor,
         opacities: torch.Tensor,
         img_size: Tuple = (256, 256),
         start_transmittance: Optional[torch.Tensor] = None,
@@ -587,7 +610,7 @@ class Scene:
             scales                  :   A torch.Tensor of shape (N, 1) (if isotropic) or
                                         (N, 3) (if anisotropic) representing the scaling
                                         components of 3D Gaussians.
-            colours                 :   A torch.Tensor of shape (N, 3) with the colour contribution
+            colors                 :   A torch.Tensor of shape (N, 3) with the color contribution
                                         of each Gaussian.
             opacities               :   A torch.Tensor of shape (N,) with the opacity of each Gaussian.
             img_size                :   The (width, height) of the image.
@@ -595,7 +618,7 @@ class Scene:
                                         for information about this argument.
 
         Returns:
-            image                   :   A torch.Tensor of shape (H, W, 3) with the rendered RGB colour image.
+            image                   :   A torch.Tensor of shape (H, W, 3) with the rendered RGB color image.
             depth                   :   A torch.Tensor of shape (H, W, 1) with the rendered depth map.
             mask                    :   A torch.Tensor of shape (H, W, 1) with the rendered silhouette map.
             final_transmittance     :   A torch.Tensor of shape (1, H, W) representing the transmittance at
@@ -629,21 +652,21 @@ class Scene:
         # in a diferent way.
         z_vals = z_vals[:, None, None, None]  # (N, 1, 1, 1)
         alphas = alphas[..., None]  # (N, H, W, 1)
-        colours = colours[:, None, None, :]  # (N, 1, 1, 3)
+        colors = colors[:, None, None, :]  # (N, 1, 1, 3)
         transmittance = transmittance[..., None]  # (N, H, W, 1)
 
-        # Step 4: Create image, depth and mask by computing the colours for each pixel.
+        # Step 4: Create image, depth and mask by computing the colors for each pixel.
 
         ### YOUR CODE HERE ###
         # HINT: Refer to README for a relevant equation
         image = None  # (H, W, 3)
 
         ### YOUR CODE HERE ###
-        # HINT: Can you implement an equation inspired by the equation for colour?
+        # HINT: Can you implement an equation inspired by the equation for color?
         depth = None  # (H, W, 1)
 
         ### YOUR CODE HERE ###
-        # HINT: Can you implement an equation inspired by the equation for colour?
+        # HINT: Can you implement an equation inspired by the equation for color?
         mask = None  # (H, W, 1)
 
         final_transmittance = transmittance[-1, ..., 0].unsqueeze(0)  # (1, H, W)
@@ -654,11 +677,11 @@ class Scene:
         camera: PerspectiveCameras,
         per_splat: int = -1,
         img_size: Tuple = (256, 256),
-        bg_colour: Tuple = (0.0, 0.0, 0.0),
+        bg_color: Tuple = (0.0, 0.0, 0.0),
     ):
         """
         Given a scene represented by N 3D Gaussians, this function renders the RGB
-        colour image, the depth map and the silhouette map that can be observed
+        color image, the depth map and the silhouette map that can be observed
         from a given pytorch 3D camera.
 
         Args:
@@ -671,15 +694,15 @@ class Scene:
                             if more gaussians are splat per function call, but at the cost of higher GPU
                             memory consumption.
             img_size    :   The (width, height) of the image to be rendered.
-            bg_color    :   A tuple indicating the RGB colour that the background should have.
+            bg_color    :   A tuple indicating the RGB color that the background should have.
 
         Returns:
-            image       :   A torch.Tensor of shape (H, W, 3) with the rendered RGB colour image.
+            image       :   A torch.Tensor of shape (H, W, 3) with the rendered RGB color image.
             depth       :   A torch.Tensor of shape (H, W, 1) with the rendered depth map.
             mask        :   A torch.Tensor of shape (H, W, 1) with the rendered silhouette map.
         """
-        bg_colour_ = torch.tensor(bg_colour)[None, None, :]  # (1, 1, 3)
-        bg_colour_ = bg_colour_.to(self.device)
+        bg_color_ = torch.tensor(bg_color)[None, None, :]  # (1, 1, 3)
+        bg_color_ = bg_color_.to(self.device)
 
         # Globally sort gaussians according to their depth value
         z_vals = self.compute_depth_values(camera)
@@ -691,16 +714,16 @@ class Scene:
         z_vals = z_vals[idxs]
         means_3D = self.gaussians.means[idxs]
 
-        # For questions 1.1, 1.2 and 1.3.2, use the below line of code for colours.
-        colours = self.gaussians.colours[idxs]
+        # For questions 1.1, 1.2 and 1.3.2, use the below line of code for colors.
+        colors = self.gaussians.colors[idxs]
 
         # [Q 1.3.1] For question 1.3.1, uncomment the below three lines to calculate the
-        # colours instead of using self.gaussians.colours[idxs]. You may also comment
+        # colors instead of using self.gaussians.colors[idxs]. You may also comment
         # out the above line of code since it will be overwritten anyway.
 
         # spherical_harmonics = self.gaussians.spherical_harmonics[idxs]
         # gaussian_dirs = self.calculate_gaussian_directions(means_3D, camera)
-        # colours = colours_from_spherical_harmonics(spherical_harmonics, gaussian_dirs)
+        # colors = colors_from_spherical_harmonics(spherical_harmonics, gaussian_dirs)
 
         # Apply activations
         quats, scales, opacities = self.gaussians.apply_activations(
@@ -719,7 +742,7 @@ class Scene:
 
             # Get image, depth and mask via splatting
             image, depth, mask, _ = self.splat(
-                camera, means_3D, z_vals, quats, scales, colours, opacities, img_size
+                camera, means_3D, z_vals, quats, scales, colors, opacities, img_size
             )
 
         # In this case we splat per_splat number of gaussians per iteration. This makes
@@ -738,7 +761,7 @@ class Scene:
                 quats_ = quats[b_idx * per_splat : (b_idx + 1) * per_splat]
                 scales_ = scales[b_idx * per_splat : (b_idx + 1) * per_splat]
                 z_vals_ = z_vals[b_idx * per_splat : (b_idx + 1) * per_splat]
-                colours_ = colours[b_idx * per_splat : (b_idx + 1) * per_splat]
+                colors_ = colors[b_idx * per_splat : (b_idx + 1) * per_splat]
                 means_3D_ = means_3D[b_idx * per_splat : (b_idx + 1) * per_splat]
                 opacities_ = opacities[b_idx * per_splat : (b_idx + 1) * per_splat]
 
@@ -749,7 +772,7 @@ class Scene:
                     z_vals_,
                     quats_,
                     scales_,
-                    colours_,
+                    colors_,
                     opacities_,
                     img_size,
                     start_transmittance,
@@ -759,7 +782,7 @@ class Scene:
                 depth = depth + depth_
                 mask = mask + mask_
 
-        image = mask * image + (1.0 - mask) * bg_colour_
+        image = mask * image + (1.0 - mask) * bg_color_
 
         return image, depth, mask
 

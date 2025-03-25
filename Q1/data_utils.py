@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import os
 
 import imageio
@@ -110,12 +111,12 @@ class TruckDataset(Dataset):
         return images, cameras, masks
 
 
-def colour_depth_q1_render(depth):
+def color_depth_q1_render(depth):
     normalized_depth = (depth - CMAP_MIN_NORM) / (CMAP_MAX_NORM - CMAP_MIN_NORM + 1e-8)
-    coloured_depth = CMAP_JET(normalized_depth)[:, :, :3]  # (H, W, 3)
-    coloured_depth = (np.clip(coloured_depth, 0.0, 1.0) * 255.0).astype(np.uint8)
+    colored_depth = CMAP_JET(normalized_depth)[:, :, :3]  # (H, W, 3)
+    colored_depth = (np.clip(colored_depth, 0.0, 1.0) * 255.0).astype(np.uint8)
 
-    return coloured_depth
+    return colored_depth
 
 
 def visualize_renders(scene, gt_viz_img, cameras, img_size):
@@ -127,7 +128,7 @@ def visualize_renders(scene, gt_viz_img, cameras, img_size):
             pred_img, _, _ = scene.render(
                 cam,
                 img_size=img_size,
-                bg_colour=(0.0, 0.0, 0.0),
+                bg_color=(0.0, 0.0, 0.0),
                 per_splat=-1,
             )
             img = torch.clamp(pred_img, 0.0, 1.0) * 255.0
@@ -203,7 +204,7 @@ def load_gaussians_from_ply(path):
     shs = shs.astype(np.float32)
 
     dc_vals = shs[:, :3]
-    dc_colours = np.maximum(dc_vals * SH_C0 + 0.5, np.zeros_like(dc_vals))
+    dc_colors = np.maximum(dc_vals * SH_C0 + 0.5, np.zeros_like(dc_vals))
 
     output = {
         "xyz": xyz,
@@ -211,14 +212,14 @@ def load_gaussians_from_ply(path):
         "scale": scales,
         "sh": shs,
         "opacity": opacities,
-        "dc_colours": dc_colours,
+        "dc_colors": dc_colors,
     }
     return output
 
 
-def colours_from_spherical_harmonics(spherical_harmonics, gaussian_dirs):
+def colors_from_spherical_harmonics(spherical_harmonics, gaussian_dirs):
     """
-    [Q 1.3.1] Computes view-dependent colour given spherical harmonic coefficients
+    [Q 1.3.1] Computes view-dependent color given spherical harmonic coefficients
     and direction vectors for each gaussian.
 
     Args:
@@ -229,9 +230,9 @@ def colours_from_spherical_harmonics(spherical_harmonics, gaussian_dirs):
                                     to each Gaussian.
 
     Returns:
-        colours                 :   A torch.Tensor of shape (N, 3) representing the view dependent
-                                    RGB colour.
+        colors                 :   A torch.Tensor of shape (N, 3) representing the view dependent
+                                    RGB color.
     """
     ### YOUR CODE HERE ###
-    colours = None
-    return colours
+    colors = None
+    return colors

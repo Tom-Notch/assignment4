@@ -67,10 +67,10 @@ repos:
       hooks:
           - id: cmake-format
 
-    - repo: https://github.com/executablebooks/mdformat # mdformat is a markdown formatter.
-      rev: 0.7.17
-      hooks:
-          - id: mdformat
+    # - repo: https://github.com/executablebooks/mdformat # mdformat is a markdown formatter.
+    #   rev: 0.7.17
+    #   hooks:
+    #       - id: mdformat
 
     - repo: https://github.com/jackdewinter/pymarkdown # pymarkdown is a markdown linter.
       rev: v0.9.22

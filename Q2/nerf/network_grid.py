@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 ####################################################################################################
 # Acknowledgements:
 # A large part of teh NeRF model and rendering code is adapted from the implementation of stable-dreamfusion.

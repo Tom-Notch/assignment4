@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import argparse
 import os
 
@@ -37,7 +38,7 @@ def setup_optimizer(gaussians):
     parameters = [
         {"params": [gaussians.pre_act_opacities], "lr": 0.05, "name": "opacities"},
         {"params": [gaussians.pre_act_scales], "lr": 0.05, "name": "scales"},
-        {"params": [gaussians.colours], "lr": 0.05, "name": "colours"},
+        {"params": [gaussians.colors], "lr": 0.05, "name": "colors"},
         {"params": [gaussians.means], "lr": 0.05, "name": "means"},
     ]
     optimizer = torch.optim.Adam(parameters, lr=0.0, eps=1e-15)
@@ -136,7 +137,7 @@ def run_training(args):
         # Rendering scene using gaussian splatting
         ### YOUR CODE HERE ###
         # HINT: Can any function from the Scene class help?
-        # HINT: Set bg_colour to (0.0, 0.0, 0.0)
+        # HINT: Set bg_color to (0.0, 0.0, 0.0)
         # HINT: Set img_size to (128, 128)
         # HINT: Get per_splat from args.gaussians_per_splat
         # HINT: camera is available above
@@ -180,7 +181,7 @@ def run_training(args):
             # Rendering scene using gaussian splatting
             ### YOUR CODE HERE ###
             # HINT: Can any function from the Scene class help?
-            # HINT: Set bg_colour to (0.0, 0.0, 0.0)
+            # HINT: Set bg_color to (0.0, 0.0, 0.0)
             # HINT: Set img_size to (128, 128)
             # HINT: Get per_splat from args.gaussians_per_splat
             # HINT: camera is available above
@@ -206,7 +207,7 @@ def run_training(args):
             # Rendering scene using gaussian splatting
             ### YOUR CODE HERE ###
             # HINT: Can any function from the Scene class help?
-            # HINT: Set bg_colour to (0.0, 0.0, 0.0)
+            # HINT: Set bg_color to (0.0, 0.0, 0.0)
             # HINT: Set img_size to (128, 128)
             # HINT: Get per_splat from args.gaussians_per_splat
             # HINT: camera is available above

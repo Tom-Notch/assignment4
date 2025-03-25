@@ -52,13 +52,13 @@ In the previous section, we had implemented code to project 3D Gaussians to obta
 A 2D Gaussian is represented by the following expression:
 
 $$
-f(\\mathbf{x}; \\boldsymbol{\\mu}\_{i}, \\boldsymbol{\\Sigma}\_{i}) = \\frac{1}{2 \\pi \\sqrt{ | \\boldsymbol{\\Sigma}\_{i} |}} \\exp \\left ( {-\\frac{1}{2}} (\\mathbf{x} - \\boldsymbol{\\mu}\_{i})^T \\boldsymbol{\\Sigma}\_{i}^{-1} (\\mathbf{x} - \\boldsymbol{\\mu}\_{i}) \\right ) = \\frac{1}{2 \\pi \\sqrt{ | \\boldsymbol{\\Sigma}\_{i} |}} \\exp \\left ( P\_{(\\mathbf{x}, i)} \\right )
+f(\mathbf{x}; \boldsymbol{\mu}_{i}, \boldsymbol{\Sigma}_{i}) = \frac{1}{2 \pi \sqrt{ | \boldsymbol{\Sigma}_{i} |}} \exp \left ( {-\frac{1}{2}} (\mathbf{x} - \boldsymbol{\mu}_{i})^T \boldsymbol{\Sigma}_{i}^{-1} (\mathbf{x} - \boldsymbol{\mu}_{i}) \right ) = \frac{1}{2 \pi \sqrt{ | \boldsymbol{\Sigma}_{i} |}} \exp \left ( P_{(\mathbf{x}, i)} \right )
 $$
 
-Here, $\\mathbf{x}$ is a 2D vector that represents the pixel location, $\\boldsymbol{\\mu}$ represents is a 2D vector representing the mean of the $i$-th 2D Gaussian, and $\\boldsymbol{\\Sigma}$ represents the covariance of the 2D Gaussian. The exponent part $P\_{(\\mathbf{x}, i)}$ is referred to as **power** in the code.
+Here, $\mathbf{x}$ is a 2D vector that represents the pixel location, $\boldsymbol{\mu}$ represents is a 2D vector representing the mean of the $i$-th 2D Gaussian, and $\boldsymbol{\Sigma}$ represents the covariance of the 2D Gaussian. The exponent part $P_{(\mathbf{x}, i)}$ is referred to as **power** in the code.
 
 $$
-P\_{(\\mathbf{x}, i)} = {-\\frac{1}{2}} (\\mathbf{x} - \\boldsymbol{\\mu}\_{i})^T \\mathbf{\\Sigma}\_{i}^{-1} (\\mathbf{x} - \\boldsymbol{\\mu}\_{i})
+P_{(\mathbf{x}, i)} = {-\frac{1}{2}} (\mathbf{x} - \boldsymbol{\mu}_{i})^T \mathbf{\Sigma}_{i}^{-1} (\mathbf{x} - \boldsymbol{\mu}_{i})
 $$
 
 The function `evaluate_gaussian_2D` of the class `Gaussians` is used to compute the power. In this section, you will have to complete this function.
@@ -77,18 +77,18 @@ Complete the functions `compute_depth_values` and `get_idxs_to_filter_and_sort` 
 
 Using these `N` ordered and filtered 2D Gaussians, we can compute their alpha and transmittance values at each pixel location in an image.
 
-The alpha value of a 2D Gaussian $i$ at a single pixel location $\\mathbf{x}$ can be calculated using:
+The alpha value of a 2D Gaussian $i$ at a single pixel location $\mathbf{x}$ can be calculated using:
 
 $$
-\\alpha\_{(\\mathbf{x}, i)} = o_i \\exp(P\_{(\\mathbf{x}, i)})
+\alpha_{(\mathbf{x}, i)} = o_i \exp(P_{(\mathbf{x}, i)})
 $$
 
 Here, $o_i$ is the opacity of each Gaussian, which is a learnable parameter.
 
-Given `N` ordered 2D Gaussians, the transmittance value of a 2D Gaussian $i$ at a single pixel location $\\mathbf{x}$ can be calculated using:
+Given `N` ordered 2D Gaussians, the transmittance value of a 2D Gaussian $i$ at a single pixel location $\mathbf{x}$ can be calculated using:
 
 $$
-T\_{(\\mathbf{x}, i)} = \\prod\_{j \\lt i} (1 - \\alpha\_{(\\mathbf{x}, j)})
+T_{(\mathbf{x}, i)} = \prod_{j \lt i} (1 - \alpha_{(\mathbf{x}, j)})
 $$
 
 In this section, you will need to complete the functions `compute_alphas` and `compute_transmittance` of the class `Scene` in `model.py` so that alpha and transmittance values can be computed.
@@ -97,17 +97,17 @@ In this section, you will need to complete the functions `compute_alphas` and `c
 
 ### 1.1.5 Perform Splatting
 
-Finally, using the computed alpha and transmittance values, we can blend the colour value of each 2D Gaussian to compute the colour at each pixel. The equation for computing the colour of a single pixel is (which is the same as equation (3) from the [original paper](https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/3d_gaussian_splatting_low.pdf)).
+Finally, using the computed alpha and transmittance values, we can blend the color value of each 2D Gaussian to compute the color at each pixel. The equation for computing the color of a single pixel is (which is the same as equation (3) from the [original paper](https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/3d_gaussian_splatting_low.pdf)).
 
-More formally, given `N` ordered 2D Gaussians, we can compute the colour value at a single pixel location $\\mathbf{x}$ by:
+More formally, given `N` ordered 2D Gaussians, we can compute the color value at a single pixel location $\mathbf{x}$ by:
 
 $$
-C\_{\\mathbf{x}} = \\sum\_{i = 1}^{N} c_i \\alpha\_{(\\mathbf{x}, i)} T\_{(\\mathbf{x}, i)}
+C_{\mathbf{x}} = \sum_{i = 1}^{N} c_i \alpha_{(\mathbf{x}, i)} T_{(\mathbf{x}, i)}
 $$
 
-Here, $c_i$ is the colour contribution of each Gaussian, which is a learnable parameter. Instead of using the colour contribution of each Gaussian, we can also use other attributes to compute the depth and silhouette mask at each pixel as well!
+Here, $c_i$ is the color contribution of each Gaussian, which is a learnable parameter. Instead of using the color contribution of each Gaussian, we can also use other attributes to compute the depth and silhouette mask at each pixel as well!
 
-In this section, you will need to complete the function `splat` of the class `Scene` in `model.py` and return the colour, depth and silhouette (mask) maps. While the equation for colour is given in this section, you will have to think and implement similar equations for computing the depth and silhouette (mask) maps as well. You can refer to the function `render` in the same class to see how the function `splat` will be used.
+In this section, you will need to complete the function `splat` of the class `Scene` in `model.py` and return the color, depth and silhouette (mask) maps. While the equation for color is given in this section, you will have to think and implement similar equations for computing the depth and silhouette (mask) maps as well. You can refer to the function `render` in the same class to see how the function `splat` will be used.
 
 Once you have finished implementing the functions, you can open the file `render.py` and complete the rendering code in the function `create_renders` (this task is very simple, you just have to call the `render` function of the object of the class `Scene`)
 
@@ -139,7 +139,7 @@ For all questions in this section, you will have to complete the code in `train.
 
 First, we must make our 3D Gaussian parameters trainable. You can do this by setting `requires_grad` to True on all necessary parameters in the function `make_trainable` in `train.py` (you will have to implement this function).
 
-Next, you will have to setup the optimizer. It is recommended to provide different learning rates for each type of parameter (for example, it might be preferable to use a much smaller learning rate for the means as compared to opacities or colours). You can refer to pytorch documentation on how to set different learning rates for different sets of parameters.
+Next, you will have to setup the optimizer. It is recommended to provide different learning rates for each type of parameter (for example, it might be preferable to use a much smaller learning rate for the means as compared to opacities or colors). You can refer to pytorch documentation on how to set different learning rates for different sets of parameters.
 
 Your task is to complete the function `setup_optimizer` in `train.py` by passing all trainable parameters and setting appropriate learning rates. Feel free to experiment with different settings of learning rates.
 
@@ -180,13 +180,13 @@ Feel free to experiment with different learning rate values and number of iterat
 
 In the previous sections, we implemented a 3D Gaussian rasterizer that is view independent. However, scenes often contain elements whose apperance looks different when viewed from a different direction (for example, reflections on a shiny surface). To model these view dependent effects, the authors of the 3D Gaussian Splatting paper use spherical harmonics.
 
-The 3D Gaussians trained using the original codebase often come with learnt spherical harmonics components as well. Infact, for the scene used in section 1.1, we do have access to the spherical harmonic components! For simplicity, we had extracted only the view independent part of the spherical harmonics (the 0th order coefficients) and returned that as colour. As a result, the renderings we obtained in the previous section can only represent view independent information, and might also have lesser visual quality.
+The 3D Gaussians trained using the original codebase often come with learnt spherical harmonics components as well. Infact, for the scene used in section 1.1, we do have access to the spherical harmonic components! For simplicity, we had extracted only the view independent part of the spherical harmonics (the 0th order coefficients) and returned that as color. As a result, the renderings we obtained in the previous section can only represent view independent information, and might also have lesser visual quality.
 
 In this section, we will explore rendering 3D Gaussians with associated spherical harmonic components. We will add support for spherical harmonics such that we can run inference on 3D Gaussians that are already pre-trained using the original repository (we will **not** focus on training spherical harmonic coefficients).
 
 In this section, you will complete code in `model.py` and `data_utils.py` to enable the utilization of spherical harmonics. You will also have to modify parts of `model.py`. Please lookout for the tag `[Q 1.3.1]` in the code to find parts of the code that need to be modified and/or completed.
 
-In particular, the function `colours_from_spherical_harmonics` requires you to compute colour given spherical harmonic components and directions. You can refer to function `get_color` in this [implementation](https://github.com/thomasantony/splat/blob/0d856a6accd60099dd9518a51b77a7bc9fd9ff6b/notes/00_Gaussian_Projection.ipynb) and create a vectorized version of the same for your implementation.
+In particular, the function `colors_from_spherical_harmonics` requires you to compute color given spherical harmonic components and directions. You can refer to function `get_color` in this [implementation](https://github.com/thomasantony/splat/blob/0d856a6accd60099dd9518a51b77a7bc9fd9ff6b/notes/00_Gaussian_Projection.ipynb) and create a vectorized version of the same for your implementation.
 
 Once you have completed the above tasks, run `render.py` (use the same command that you used for question 1.1.5). This script will take a few minutes to render views of a scene represented by pre-trained 3D Gaussians.
 
