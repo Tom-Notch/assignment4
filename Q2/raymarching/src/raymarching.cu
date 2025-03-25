@@ -337,12 +337,12 @@ void flatten_rays(const at::Tensor rays, const uint32_t N, const uint32_t M, at:
 template <typename scalar_t>
 __global__ void kernel_march_rays_train(
     const scalar_t * __restrict__ rays_o,
-    const scalar_t * __restrict__ rays_d,  
+    const scalar_t * __restrict__ rays_d,
     const uint8_t * __restrict__ grid,
     const float bound, const bool contract,
     const float dt_gamma, const uint32_t max_steps,
     const uint32_t N, const uint32_t C, const uint32_t H,
-    const scalar_t* __restrict__ nears, 
+    const scalar_t* __restrict__ nears,
     const scalar_t* __restrict__ fars,
     scalar_t * xyzs, scalar_t * dirs, scalar_t * ts,
     int * rays,
@@ -385,14 +385,14 @@ __global__ void kernel_march_rays_train(
     const float dt_min = 2 * SQRT3() / max_steps;
     const float dt_max = 2 * SQRT3() * bound / H;
     // const float dt_max = 1e10f;
-    
+
     float t0 = near;
     t0 += clamp(t0 * dt_gamma, dt_min, dt_max) * noise;
     float t = t0;
     uint32_t step = 0;
 
     //if (t < far) printf("valid ray %d t=%f near=%f far=%f \n", n, t, near, far);
-    
+
     while (t < far && step < num_steps) {
         // current point
         const float x = clamp(ox + t * dx, -bound, bound);
@@ -417,7 +417,7 @@ __global__ void kernel_march_rays_train(
             cy *= Linf_scale;
             cz *= Linf_scale;
         }
-        
+
         // convert to nearest grid position
         const int nx = clamp(0.5 * (cx * mip_rbound + 1) * H, 0.0f, (float)(H - 1));
         const int ny = clamp(0.5 * (cy * mip_rbound + 1) * H, 0.0f, (float)(H - 1));
@@ -457,7 +457,7 @@ __global__ void kernel_march_rays_train(
 
             const float tt = t + fmaxf(0.0f, fminf(tx, fminf(ty, tz)));
             // step until next voxel
-            do { 
+            do {
                 dt = clamp(t * dt_gamma, dt_min, dt_max);
                 t += dt;
             } while (t < tt);
@@ -477,7 +477,7 @@ __global__ void kernel_march_rays_train(
 void march_rays_train(const at::Tensor rays_o, const at::Tensor rays_d, const at::Tensor grid, const float bound, const bool contract, const float dt_gamma, const uint32_t max_steps, const uint32_t N, const uint32_t C, const uint32_t H, const at::Tensor nears, const at::Tensor fars, at::optional<at::Tensor> xyzs, at::optional<at::Tensor> dirs, at::optional<at::Tensor> ts, at::Tensor rays, at::Tensor counter, at::Tensor noises) {
 
     static constexpr uint32_t N_THREAD = 128;
-    
+
     AT_DISPATCH_FLOATING_TYPES_AND_HALF(
     rays_o.scalar_type(), "march_rays_train", ([&] {
         kernel_march_rays_train<<<div_round_up(N, N_THREAD), N_THREAD>>>(rays_o.data_ptr<scalar_t>(), rays_d.data_ptr<scalar_t>(), grid.data_ptr<uint8_t>(), bound, contract, dt_gamma, max_steps, N, C, H, nears.data_ptr<scalar_t>(), fars.data_ptr<scalar_t>(),
@@ -500,7 +500,7 @@ void march_rays_train(const at::Tensor rays_o, const at::Tensor rays_d, const at
 template <typename scalar_t>
 __global__ void kernel_composite_rays_train_forward(
     const scalar_t * __restrict__ sigmas,
-    const scalar_t * __restrict__ rgbs,  
+    const scalar_t * __restrict__ rgbs,
     const scalar_t * __restrict__ ts,
     const int * __restrict__ rays,
     const uint32_t M, const uint32_t N, const float T_thresh, const bool binarize,
@@ -513,7 +513,7 @@ __global__ void kernel_composite_rays_train_forward(
     const uint32_t n = threadIdx.x + blockIdx.x * blockDim.x;
     if (n >= N) return;
 
-    // locate 
+    // locate
     uint32_t offset = rays[n * 2];
     uint32_t num_steps = rays[n * 2 + 1];
 
@@ -532,7 +532,7 @@ __global__ void kernel_composite_rays_train_forward(
     sigmas += offset;
     rgbs += offset * 3;
 
-    // accumulate 
+    // accumulate
     uint32_t step = 0;
 
     float T = 1.0f;
@@ -551,7 +551,7 @@ __global__ void kernel_composite_rays_train_forward(
         b += weight * rgbs[2];
         ws += weight;
         d += weight * ts[0];
-        
+
         T *= 1.0f - alpha;
 
         // minimal remained transmittence
@@ -598,7 +598,7 @@ void composite_rays_train_forward(const at::Tensor sigmas, const at::Tensor rgbs
 // rgbs: [M, 3]
 // ts: [M, 2]
 // rays: [N, 2], offset, num_steps
-// weights_sum: [N,], weights_sum here 
+// weights_sum: [N,], weights_sum here
 // image: [N, 3]
 // grad_sigmas: [M]
 // grad_rgbs: [M, 3]
@@ -609,7 +609,7 @@ __global__ void kernel_composite_rays_train_backward(
     const scalar_t * __restrict__ grad_depth,
     const scalar_t * __restrict__ grad_image,
     const scalar_t * __restrict__ sigmas,
-    const scalar_t * __restrict__ rgbs, 
+    const scalar_t * __restrict__ rgbs,
     const scalar_t * __restrict__ ts,
     const int * __restrict__ rays,
     const scalar_t * __restrict__ weights_sum,
@@ -623,7 +623,7 @@ __global__ void kernel_composite_rays_train_backward(
     const uint32_t n = threadIdx.x + blockIdx.x * blockDim.x;
     if (n >= N) return;
 
-    // locate 
+    // locate
     uint32_t offset = rays[n * 2];
     uint32_t num_steps = rays[n * 2 + 1];
 
@@ -642,15 +642,15 @@ __global__ void kernel_composite_rays_train_backward(
     grad_sigmas += offset;
     grad_rgbs += offset * 3;
 
-    // accumulate 
+    // accumulate
     uint32_t step = 0;
-    
+
     float T = 1.0f;
     const float r_final = image[0], g_final = image[1], b_final = image[2], ws_final = weights_sum[0], d_final = depth[0];
     float r = 0, g = 0, b = 0, ws = 0, d = 0;
 
     while (step < num_steps) {
-        
+
         const float real_alpha = 1.0f - __expf(- sigmas[0] * ts[1]);
         const float alpha = binarize ? (real_alpha > 0.5 ? 1.0 : 0.0) : real_alpha;
         const float weight = alpha * T;
@@ -662,7 +662,7 @@ __global__ void kernel_composite_rays_train_backward(
         d += weight * ts[0];
 
         T *= 1.0f - alpha;
-        
+
         // check https://note.kiui.moe/others/nerf_gradient/ for the gradient calculation.
         // write grad_rgbs
         grad_rgbs[0] = grad_image[0] * weight;
@@ -671,17 +671,17 @@ __global__ void kernel_composite_rays_train_backward(
 
         // write grad_sigmas
         grad_sigmas[0] = ts[1] * (
-            grad_image[0] * (T * rgbs[0] - (r_final - r)) + 
-            grad_image[1] * (T * rgbs[1] - (g_final - g)) + 
+            grad_image[0] * (T * rgbs[0] - (r_final - r)) +
+            grad_image[1] * (T * rgbs[1] - (g_final - g)) +
             grad_image[2] * (T * rgbs[2] - (b_final - b)) +
-            (grad_weights_sum[0] + grad_weights[0]) * (T - (ws_final - ws)) + 
+            (grad_weights_sum[0] + grad_weights[0]) * (T - (ws_final - ws)) +
             grad_depth[0] * (T * ts[0] - (d_final - d))
         );
 
         //printf("[n=%d] num_steps=%d, T=%f, grad_sigmas=%f, r_final=%f, r=%f\n", n, step, T, grad_sigmas[0], r_final, r);
         // minimal remained transmittence
         if (T < T_thresh) break;
-        
+
         // locate
         sigmas++;
         rgbs += 3;
@@ -712,12 +712,12 @@ void composite_rays_train_backward(const at::Tensor grad_weights, const at::Tens
 
 template <typename scalar_t>
 __global__ void kernel_march_rays(
-    const uint32_t n_alive, 
-    const uint32_t n_step, 
-    const int* __restrict__ rays_alive, 
-    const scalar_t* __restrict__ rays_t, 
-    const scalar_t* __restrict__ rays_o, 
-    const scalar_t* __restrict__ rays_d, 
+    const uint32_t n_alive,
+    const uint32_t n_step,
+    const int* __restrict__ rays_alive,
+    const scalar_t* __restrict__ rays_t,
+    const scalar_t* __restrict__ rays_o,
+    const scalar_t* __restrict__ rays_d,
     const float bound, const bool contract,
     const float dt_gamma, const uint32_t max_steps,
     const uint32_t C, const uint32_t H,
@@ -732,20 +732,20 @@ __global__ void kernel_march_rays(
 
     const int index = rays_alive[n]; // ray id
     const float noise = noises[n];
-    
+
     // locate
     rays_o += index * 3;
     rays_d += index * 3;
     xyzs += n * n_step * 3;
     dirs += n * n_step * 3;
     ts += n * n_step * 2;
-    
+
     const float ox = rays_o[0], oy = rays_o[1], oz = rays_o[2];
     const float dx = rays_d[0], dy = rays_d[1], dz = rays_d[2];
     const float rdx = 1 / dx, rdy = 1 / dy, rdz = 1 / dz;
     const float rH = 1 / (float)H;
     const float H3 = H * H * H;
-    
+
     const float near = nears[index], far = fars[index];
 
     const float dt_min = 2 * SQRT3() / max_steps;
@@ -770,7 +770,7 @@ __global__ void kernel_march_rays(
 
         const float mip_bound = fminf(scalbnf(1, level), bound);
         const float mip_rbound = 1 / mip_bound;
-        
+
         // contraction
         float cx = x, cy = y, cz = z;
         const float mag = fmaxf(fabsf(x), fmaxf(fabsf(y), fabsf(z)));
@@ -781,7 +781,7 @@ __global__ void kernel_march_rays(
             cy *= Linf_scale;
             cz *= Linf_scale;
         }
-        
+
         // convert to nearest grid position
         const int nx = clamp(0.5 * (cx * mip_rbound + 1) * H, 0.0f, (float)(H - 1));
         const int ny = clamp(0.5 * (cy * mip_rbound + 1) * H, 0.0f, (float)(H - 1));
@@ -820,7 +820,7 @@ __global__ void kernel_march_rays(
             const float tz = (((nz + 0.5f + 0.5f * signf(dz)) * rH * 2 - 1) * mip_bound - cz) * rdz;
             const float tt = t + fmaxf(0.0f, fminf(tx, fminf(ty, tz)));
             // step until next voxel
-            do { 
+            do {
                 dt = clamp(t * dt_gamma, dt_min, dt_max);
                 t += dt;
             } while (t < tt);
@@ -841,26 +841,26 @@ void march_rays(const uint32_t n_alive, const uint32_t n_step, const at::Tensor 
 
 template <typename scalar_t>
 __global__ void kernel_composite_rays(
-    const uint32_t n_alive, 
-    const uint32_t n_step, 
+    const uint32_t n_alive,
+    const uint32_t n_step,
     const float T_thresh, const bool binarize,
-    int* rays_alive, 
-    scalar_t* rays_t, 
-    const scalar_t* __restrict__ sigmas, 
-    const scalar_t* __restrict__ rgbs, 
-    const scalar_t* __restrict__ ts, 
+    int* rays_alive,
+    scalar_t* rays_t,
+    const scalar_t* __restrict__ sigmas,
+    const scalar_t* __restrict__ rgbs,
+    const scalar_t* __restrict__ ts,
     scalar_t* weights_sum, scalar_t* depth, scalar_t* image
 ) {
     const uint32_t n = threadIdx.x + blockIdx.x * blockDim.x;
     if (n >= n_alive) return;
 
     const int index = rays_alive[n]; // ray id
-    
-    // locate 
+
+    // locate
     sigmas += n * n_step;
     rgbs += n * n_step * 3;
     ts += n * n_step * 2;
-    
+
     rays_t += index;
     weights_sum += index;
     depth += index;
@@ -869,20 +869,20 @@ __global__ void kernel_composite_rays(
     float t;
     float d = depth[0], r = image[0], g = image[1], b = image[2], weight_sum = weights_sum[0];
 
-    // accumulate 
+    // accumulate
     uint32_t step = 0;
     while (step < n_step) {
-        
+
         // ray is terminated if t == 0
         if (ts[0] == 0) break;
-        
+
         const float real_alpha = 1.0f - __expf(- sigmas[0] * ts[1]);
         const float alpha = binarize ? (real_alpha > 0.5 ? 1.0 : 0.0) : real_alpha;
 
-        /* 
+        /*
         T_0 = 1; T_i = \prod_{j=0}^{i-1} (1 - alpha_j)
         w_i = alpha_i * T_i
-        --> 
+        -->
         T_i = 1 - \sum_{j=0}^{i-1} w_j
         */
         const float T = 1 - weight_sum;

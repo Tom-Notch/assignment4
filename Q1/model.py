@@ -1,17 +1,24 @@
 import math
-import torch
-import numpy as np
+from typing import Optional
+from typing import Tuple
 
-from typing import Tuple, Optional
+import numpy as np
+import torch
+from data_utils import colours_from_spherical_harmonics
+from data_utils import load_gaussians_from_ply
 from pytorch3d.ops.knn import knn_points
 from pytorch3d.renderer.cameras import PerspectiveCameras
-from data_utils import load_gaussians_from_ply, colours_from_spherical_harmonics
+
 
 class Gaussians:
 
     def __init__(
-        self, init_type: str, device: str, load_path: Optional[str] = None,
-        num_points: Optional[int] = None, isotropic: Optional[bool] = None
+        self,
+        init_type: str,
+        device: str,
+        load_path: Optional[str] = None,
+        num_points: Optional[int] = None,
+        isotropic: Optional[bool] = None,
     ):
 
         self.device = device
@@ -20,10 +27,12 @@ class Gaussians:
 
         if init_type == "gaussians":
             if isotropic is not None:
-                raise ValueError((
-                    "Isotropy/Anisotropy will be determined from pre-trained gaussians. "
-                    "Please set isotropic to None."
-                ))
+                raise ValueError(
+                    (
+                        "Isotropy/Anisotropy will be determined from pre-trained gaussians. "
+                        "Please set isotropic to None."
+                    )
+                )
             if load_path is None:
                 raise ValueError
 
@@ -106,7 +115,9 @@ class Gaussians:
 
         # Initializing opacities such that all when sigmoid is applied to pre_act_opacities,
         # we will have a opacity value close to (but less than) 1.0
-        data["pre_act_opacities"] = 8.0 * torch.ones((len(means),), dtype=torch.float32)  # (N,)
+        data["pre_act_opacities"] = 8.0 * torch.ones(
+            (len(means),), dtype=torch.float32
+        )  # (N,)
 
         # Initializing colors randomly
         data["colours"] = torch.rand((len(means), 3), dtype=torch.float32)  # (N, 3)
@@ -117,8 +128,12 @@ class Gaussians:
         data["pre_act_quats"] = quats  # (N, 4)
 
         # Initializing scales using the mean distance of each point to its 50 nearest points
-        dists, _, _ = knn_points(data["means"].unsqueeze(0), data["means"].unsqueeze(0), K=50)
-        data["pre_act_scales"] = torch.log(torch.mean(dists[0], dim=1)).unsqueeze(1)  # (N, 1)
+        dists, _, _ = knn_points(
+            data["means"].unsqueeze(0), data["means"].unsqueeze(0), K=50
+        )
+        data["pre_act_scales"] = torch.log(torch.mean(dists[0], dim=1)).unsqueeze(
+            1
+        )  # (N, 1)
 
         if not self.is_isotropic:
             data["pre_act_scales"] = data["pre_act_scales"].repeat(1, 3)  # (N, 3)
@@ -134,7 +149,9 @@ class Gaussians:
 
         # Initializing opacities such that all when sigmoid is applied to pre_act_opacities,
         # we will have a opacity value close to (but less than) 1.0
-        data["pre_act_opacities"] = 8.0 * torch.ones((num_points,), dtype=torch.float32)  # (N,)
+        data["pre_act_opacities"] = 8.0 * torch.ones(
+            (num_points,), dtype=torch.float32
+        )  # (N,)
 
         # Initializing colors randomly
         data["colours"] = torch.rand((num_points, 3), dtype=torch.float32)  # (N, 3)
@@ -145,14 +162,18 @@ class Gaussians:
         data["pre_act_quats"] = quats  # (N, 4)
 
         # Initializing scales randomly
-        data["pre_act_scales"] = torch.log((torch.rand((num_points, 1), dtype=torch.float32) + 1e-6) * 0.01)
+        data["pre_act_scales"] = torch.log(
+            (torch.rand((num_points, 1), dtype=torch.float32) + 1e-6) * 0.01
+        )
 
         if not self.is_isotropic:
             data["pre_act_scales"] = data["pre_act_scales"].repeat(1, 3)  # (N, 3)
 
         return data
 
-    def _compute_jacobian(self, means_3D: torch.Tensor, camera: PerspectiveCameras, img_size: Tuple):
+    def _compute_jacobian(
+        self, means_3D: torch.Tensor, camera: PerspectiveCameras, img_size: Tuple
+    ):
 
         if camera.in_ndc():
             raise RuntimeError
@@ -169,13 +190,13 @@ class Gaussians:
         tx = means_view_space[:, 0]
         ty = means_view_space[:, 1]
         tz = means_view_space[:, 2]
-        tz2 = tz*tz
+        tz2 = tz * tz
 
         lim_x = 1.3 * half_tan_fov_x
         lim_y = 1.3 * half_tan_fov_y
 
-        tx = torch.clamp(tx/tz, -lim_x, lim_x) * tz
-        ty = torch.clamp(ty/tz, -lim_y, lim_y) * tz
+        tx = torch.clamp(tx / tz, -lim_x, lim_x) * tz
+        ty = torch.clamp(ty / tz, -lim_y, lim_y) * tz
 
         J = torch.zeros((len(tx), 2, 3))  # (N, 2, 3)
         J = J.to(self.device)
@@ -196,10 +217,14 @@ class Gaussians:
         for attr in attrs:
             param = getattr(self, attr)
             if not getattr(param, "requires_grad", False):
-                raise Exception("Please use function make_trainable to make parameters trainable")
+                raise Exception(
+                    "Please use function make_trainable to make parameters trainable"
+                )
 
         if self.is_isotropic and self.pre_act_quats.requires_grad:
-            raise RuntimeError("You do not need to optimize quaternions in isotropic mode.")
+            raise RuntimeError(
+                "You do not need to optimize quaternions in isotropic mode."
+            )
 
     def to_cuda(self):
 
@@ -249,8 +274,12 @@ class Gaussians:
         return cov_3D
 
     def compute_cov_2D(
-        self, means_3D: torch.Tensor, quats: torch.Tensor, scales: torch.Tensor,
-        camera: PerspectiveCameras, img_size: Tuple
+        self,
+        means_3D: torch.Tensor,
+        quats: torch.Tensor,
+        scales: torch.Tensor,
+        camera: PerspectiveCameras,
+        img_size: Tuple,
     ):
         """
         Computes the covariance matrices of 2D Gaussians using equation (5) of the 3D
@@ -323,7 +352,9 @@ class Gaussians:
         Returns:
             cov_2D_inverse  :   A torch.Tensor of shape (N, 2, 2)
         """
-        determinants = cov_2D[:, 0, 0] * cov_2D[:, 1, 1] - cov_2D[:, 1, 0] * cov_2D[:, 0, 1]
+        determinants = (
+            cov_2D[:, 0, 0] * cov_2D[:, 1, 1] - cov_2D[:, 1, 0] * cov_2D[:, 0, 1]
+        )
         determinants = determinants[:, None, None]  # (N, 1, 1)
 
         cov_2D_inverse = torch.zeros_like(cov_2D)  # (N, 2, 2)
@@ -337,7 +368,9 @@ class Gaussians:
         return cov_2D_inverse
 
     @staticmethod
-    def evaluate_gaussian_2D(points_2D: torch.Tensor, means_2D: torch.Tensor, cov_2D_inverse: torch.Tensor):
+    def evaluate_gaussian_2D(
+        points_2D: torch.Tensor, means_2D: torch.Tensor, cov_2D_inverse: torch.Tensor
+    ):
         """
         Computes the exponent (power) of 2D Gaussians.
 
@@ -374,6 +407,7 @@ class Gaussians:
         opacities = torch.sigmoid(pre_act_opacities)
 
         return quats, scales, opacities
+
 
 class Scene:
 
@@ -446,7 +480,7 @@ class Scene:
 
         # point_2D contains all possible pixel locations in an image
         xs, ys = torch.meshgrid(torch.arange(W), torch.arange(H), indexing="xy")
-        points_2D = torch.stack((xs.flatten(), ys.flatten()), dim = 1)  # (H*W, 2)
+        points_2D = torch.stack((xs.flatten(), ys.flatten()), dim=1)  # (H*W, 2)
         points_2D = points_2D.to(self.device)
 
         points_2D = points_2D.unsqueeze(0)  # (1, H*W, 2)
@@ -470,13 +504,12 @@ class Scene:
 
         # Post processing for numerical stability
         alphas = torch.minimum(alphas, torch.full_like(alphas, 0.99))
-        alphas = torch.where(alphas < 1/255.0, 0.0, alphas)
+        alphas = torch.where(alphas < 1 / 255.0, 0.0, alphas)
 
         return alphas
 
     def compute_transmittance(
-        self, alphas: torch.Tensor,
-        start_transmittance: Optional[torch.Tensor] = None
+        self, alphas: torch.Tensor, start_transmittance: Optional[torch.Tensor] = None
     ):
         """
         Given the alpha values of N ordered Gaussians, this function computes
@@ -520,14 +553,22 @@ class Scene:
         transmittance = None  # (N, H, W)
 
         # Post processing for numerical stability
-        transmittance = torch.where(transmittance < 1e-4, 0.0, transmittance)  # (N, H, W)
+        transmittance = torch.where(
+            transmittance < 1e-4, 0.0, transmittance
+        )  # (N, H, W)
 
         return transmittance
 
     def splat(
-        self, camera: PerspectiveCameras, means_3D: torch.tensor, z_vals: torch.Tensor,
-        quats: torch.Tensor, scales: torch.Tensor, colours: torch.Tensor,
-        opacities: torch.Tensor, img_size: Tuple = (256, 256),
+        self,
+        camera: PerspectiveCameras,
+        means_3D: torch.tensor,
+        z_vals: torch.Tensor,
+        quats: torch.Tensor,
+        scales: torch.Tensor,
+        colours: torch.Tensor,
+        opacities: torch.Tensor,
+        img_size: Tuple = (256, 256),
         start_transmittance: Optional[torch.Tensor] = None,
     ):
         """
@@ -609,8 +650,10 @@ class Scene:
         return image, depth, mask, final_transmittance
 
     def render(
-        self, camera: PerspectiveCameras,
-        per_splat: int = -1, img_size: Tuple = (256, 256),
+        self,
+        camera: PerspectiveCameras,
+        per_splat: int = -1,
+        img_size: Tuple = (256, 256),
         bg_colour: Tuple = (0.0, 0.0, 0.0),
     ):
         """
@@ -676,8 +719,7 @@ class Scene:
 
             # Get image, depth and mask via splatting
             image, depth, mask, _ = self.splat(
-                camera, means_3D, z_vals, quats, scales,
-                colours, opacities, img_size
+                camera, means_3D, z_vals, quats, scales, colours, opacities, img_size
             )
 
         # In this case we splat per_splat number of gaussians per iteration. This makes
@@ -693,17 +735,24 @@ class Scene:
 
             for b_idx in range(num_mini_batches):
 
-                quats_ = quats[b_idx * per_splat: (b_idx+1) * per_splat]
-                scales_ = scales[b_idx * per_splat: (b_idx+1) * per_splat]
-                z_vals_ = z_vals[b_idx * per_splat: (b_idx+1) * per_splat]
-                colours_ = colours[b_idx * per_splat: (b_idx+1) * per_splat]
-                means_3D_ = means_3D[b_idx * per_splat: (b_idx+1) * per_splat]
-                opacities_ = opacities[b_idx * per_splat: (b_idx+1) * per_splat]
+                quats_ = quats[b_idx * per_splat : (b_idx + 1) * per_splat]
+                scales_ = scales[b_idx * per_splat : (b_idx + 1) * per_splat]
+                z_vals_ = z_vals[b_idx * per_splat : (b_idx + 1) * per_splat]
+                colours_ = colours[b_idx * per_splat : (b_idx + 1) * per_splat]
+                means_3D_ = means_3D[b_idx * per_splat : (b_idx + 1) * per_splat]
+                opacities_ = opacities[b_idx * per_splat : (b_idx + 1) * per_splat]
 
                 # Get image, depth and mask via splatting
                 image_, depth_, mask_, start_transmittance = self.splat(
-                    camera, means_3D_, z_vals_, quats_, scales_, colours_,
-                    opacities_, img_size, start_transmittance
+                    camera,
+                    means_3D_,
+                    z_vals_,
+                    quats_,
+                    scales_,
+                    colours_,
+                    opacities_,
+                    img_size,
+                    start_transmittance,
                 )
 
                 image = image + image_

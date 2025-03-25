@@ -1,14 +1,17 @@
-import os
-import torch
-import imageio
 import argparse
-import numpy as np
+import os
 
-from PIL import Image
-from tqdm import tqdm
-from model import Gaussians, Scene
+import imageio
+import numpy as np
+import torch
 from data_utils import colour_depth_q1_render
-from pytorch3d.renderer.cameras import PerspectiveCameras, look_at_view_transform
+from model import Gaussians
+from model import Scene
+from PIL import Image
+from pytorch3d.renderer.cameras import look_at_view_transform
+from pytorch3d.renderer.cameras import PerspectiveCameras
+from tqdm import tqdm
+
 
 def create_renders(args):
 
@@ -25,8 +28,7 @@ def create_renders(args):
 
     # Loading pre-trained gaussians
     gaussians = Gaussians(
-        load_path=args.data_path, init_type="gaussians",
-        device=args.device
+        load_path=args.data_path, init_type="gaussians", device=args.device
     )
 
     # Preprocessing for ease of rendering
@@ -40,11 +42,16 @@ def create_renders(args):
     for i in tqdm(range(num_views), desc="Rendering"):
 
         dist = 6.0
-        R, T = look_at_view_transform(dist = dist, azim=azims[i], elev=elevs[i], up=((0, -1, 0),))
+        R, T = look_at_view_transform(
+            dist=dist, azim=azims[i], elev=elevs[i], up=((0, -1, 0),)
+        )
         camera = PerspectiveCameras(
-            focal_length=5.0 * dim/2.0, in_ndc=False,
-            principal_point=((dim/2, dim/2),),
-            R=R, T=T, image_size=(img_size,),
+            focal_length=5.0 * dim / 2.0,
+            in_ndc=False,
+            principal_point=((dim / 2, dim / 2),),
+            R=R,
+            T=T,
+            image_size=(img_size,),
         ).to(args.device)
 
         with torch.no_grad():
@@ -68,35 +75,44 @@ def create_renders(args):
         depth = depth[:, :, 0].astype(np.float32)  # (H, W)
         coloured_depth = colour_depth_q1_render(depth)  # (H, W, 3)
 
-        concat = np.concatenate([img, coloured_depth, mask], axis = 1)
-        resized = Image.fromarray(concat).resize((256*3, 256))
+        concat = np.concatenate([img, coloured_depth, mask], axis=1)
+        resized = Image.fromarray(concat).resize((256 * 3, 256))
         resized.save(debug_path)
 
         imgs.append(np.array(resized))
 
     gif_path = os.path.join(args.out_path, "q1_render.gif")
-    imageio.mimwrite(gif_path, imgs, duration=1000.0*(1/10.0), loop=0)
+    imageio.mimwrite(gif_path, imgs, duration=1000.0 * (1 / 10.0), loop=0)
+
 
 def get_args():
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--out_path", default="./output", type=str,
-        help="Path to the directory where output should be saved to."
+        "--out_path",
+        default="./output",
+        type=str,
+        help="Path to the directory where output should be saved to.",
     )
     parser.add_argument(
-        "--data_path", default="./data/chair.ply", type=str,
-        help="Path to the pre-trained gaussian data to be rendered."
+        "--data_path",
+        default="./data/chair.ply",
+        type=str,
+        help="Path to the pre-trained gaussian data to be rendered.",
     )
     parser.add_argument(
-        "--img_dim", default=256, type=int,
+        "--img_dim",
+        default=256,
+        type=int,
         help=(
             "Spatial dimension of the rendered image. "
             "The rendered image will have img_dim as its height and width."
-        )
+        ),
     )
     parser.add_argument(
-        "--gaussians_per_splat", default=2048, type=int,
+        "--gaussians_per_splat",
+        default=2048,
+        type=int,
         help=(
             "Number of gaussians to splat in one function call. If set to -1, "
             "then all gaussians in the scene are splat in a single function call. "
@@ -105,11 +121,12 @@ def get_args():
             "lesser number of gaussians). In general, the algorithm can run faster "
             "if more gaussians are splat per function call, but at the cost of higher GPU "
             "memory consumption."
-        )
+        ),
     )
     parser.add_argument("--device", default="cuda", type=str, choices=["cuda", "cpu"])
     args = parser.parse_args()
     return args
+
 
 if __name__ == "__main__":
 

@@ -1,6 +1,7 @@
 import torch
 import torch.nn.functional as F
-from diffusers import DDIMScheduler, StableDiffusionPipeline
+from diffusers import DDIMScheduler
+from diffusers import StableDiffusionPipeline
 
 
 class SDS:
@@ -151,19 +152,15 @@ class SDS:
         # predict the noise residual with unet, NO grad!
         with torch.no_grad():
             ### YOUR CODE HERE ###
- 
 
             if text_embeddings_uncond is not None and guidance_scale != 1:
                 ### YOUR CODE HERE ###
                 pass
- 
-
 
         # Compute SDS loss
         w = 1 - self.alphas[t]
         ### YOUR CODE HERE ###
 
-
-        loss = 
+        # loss =
 
         return loss

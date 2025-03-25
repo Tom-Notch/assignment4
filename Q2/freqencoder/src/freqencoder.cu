@@ -28,7 +28,7 @@ __host__ __device__ T div_round_up(T val, T divisor) {
 // inputs: [B, D]
 // outputs: [B, C], C = D + D * deg * 2
 __global__ void kernel_freq(
-    const float * __restrict__ inputs, 
+    const float * __restrict__ inputs,
     uint32_t B, uint32_t D, uint32_t deg, uint32_t C,
     float * outputs
 ) {
@@ -78,7 +78,7 @@ __global__ void kernel_freq_backward(
     outputs += b * C;
     grad_inputs += t;
 
-    // register 
+    // register
     float result = grad[d];
     grad += D;
     outputs += D;
@@ -97,7 +97,7 @@ __global__ void kernel_freq_backward(
 void freq_encode_forward(at::Tensor inputs, const uint32_t B, const uint32_t D, const uint32_t deg, const uint32_t C, at::Tensor outputs) {
     CHECK_CUDA(inputs);
     CHECK_CUDA(outputs);
-    
+
     CHECK_CONTIGUOUS(inputs);
     CHECK_CONTIGUOUS(outputs);
 
@@ -114,7 +114,7 @@ void freq_encode_backward(at::Tensor grad, at::Tensor outputs, const uint32_t B,
     CHECK_CUDA(grad);
     CHECK_CUDA(outputs);
     CHECK_CUDA(grad_inputs);
-    
+
     CHECK_CONTIGUOUS(grad);
     CHECK_CONTIGUOUS(outputs);
     CHECK_CONTIGUOUS(grad_inputs);

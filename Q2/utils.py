@@ -5,16 +5,15 @@ import imageio
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from pytorch3d.io import load_obj, load_objs_as_meshes
-from pytorch3d.renderer import (
-    FoVPerspectiveCameras,
-    HardPhongShader,
-    MeshRasterizer,
-    MeshRenderer,
-    PointLights,
-    RasterizationSettings,
-    look_at_view_transform,
-)
+from pytorch3d.io import load_obj
+from pytorch3d.io import load_objs_as_meshes
+from pytorch3d.renderer import FoVPerspectiveCameras
+from pytorch3d.renderer import HardPhongShader
+from pytorch3d.renderer import look_at_view_transform
+from pytorch3d.renderer import MeshRasterizer
+from pytorch3d.renderer import MeshRenderer
+from pytorch3d.renderer import PointLights
+from pytorch3d.renderer import RasterizationSettings
 from skimage import img_as_ubyte
 from torch.optim.lr_scheduler import LambdaLR
 
@@ -125,6 +124,7 @@ def render_360_views(mesh, renderer, device, dist=3, elev=0, output_path=None):
 
 
 from pytorch3d.io import load_obj, load_objs_as_meshes
+
 
 def init_mesh(
     model_path,

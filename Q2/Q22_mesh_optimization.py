@@ -8,21 +8,17 @@ import pytorch3d
 import torch
 from implicit import ColorField
 from PIL import Image
-from pytorch3d.renderer import (
-    FoVPerspectiveCameras,
-    TexturesVertex,
-    look_at_view_transform,
-)
+from pytorch3d.renderer import FoVPerspectiveCameras
+from pytorch3d.renderer import look_at_view_transform
+from pytorch3d.renderer import TexturesVertex
 from SDS import SDS
 from tqdm import tqdm
-from utils import (
-    get_cosine_schedule_with_warmup,
-    get_mesh_renderer_soft,
-    init_mesh,
-    prepare_embeddings,
-    render_360_views,
-    seed_everything,
-)
+from utils import get_cosine_schedule_with_warmup
+from utils import get_mesh_renderer_soft
+from utils import init_mesh
+from utils import prepare_embeddings
+from utils import render_360_views
+from utils import seed_everything
 
 
 def optimize_mesh_texture(
@@ -80,7 +76,7 @@ def optimize_mesh_texture(
     ### YOUR CODE HERE ###
     # create a list of query cameras as the training set
     # Note: to create the dataset, you can either pre-define a list of query cameras as below or randomly sample a camera pose on the fly in the training loop.
-    query_cameras = [] # optional
+    query_cameras = []  # optional
 
     # Step 4. Create optimizer training parameters
     optimizer = torch.optim.AdamW(color_field.parameters(), lr=5e-4, weight_decay=0)
@@ -100,13 +96,11 @@ def optimize_mesh_texture(
 
         # Forward pass
         # Render a randomly sampled camera view to optimize in this iteration
-        rend = 
+        # rend =
         # Encode the rendered image to latents
-        latents = 
+        # latents =
         # Compute the loss
-        loss =
-
-
+        # loss =
 
         # Backward pass
         loss.backward()

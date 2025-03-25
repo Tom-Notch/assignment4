@@ -1,17 +1,19 @@
 import os
-import torch
-import imageio
-import numpy as np
-import matplotlib.pyplot as plt
 
+import imageio
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
 from PIL import Image
 from plyfile import PlyData
+from pytorch3d.renderer.cameras import look_at_view_transform
+from pytorch3d.renderer.cameras import PerspectiveCameras
 from torch.utils.data import Dataset
-from pytorch3d.renderer.cameras import PerspectiveCameras, look_at_view_transform
 
 SH_C0 = 0.28209479177387814
 CMAP_JET = plt.get_cmap("jet")
 CMAP_MIN_NORM, CMAP_MAX_NORM = 5.0, 7.0
+
 
 class TruckDataset(Dataset):
 
@@ -51,31 +53,31 @@ class TruckDataset(Dataset):
             else:
                 img = torch.tensor(img_[..., :3])  # (H, W, 3)
                 mask = torch.tensor(img_[..., 3:4])  # (H, W, 1)
-                
+
             img_size = img.shape[:2]
             h, w = img_size
-            
+
             # Checking if all data samples have the same image size
             if data_img_size is None:
-                data_img_size = (w,h) 
+                data_img_size = (w, h)
             else:
                 if data_img_size[0] != img_size[1] or data_img_size[1] != img_size[0]:
                     raise RuntimeError
 
             pose = np.load(npy_path)
-            R, T, F, C = pose[:9].reshape((3,3)), pose[9:12], pose[12:14], pose[14:16]
-            
+            R, T, F, C = pose[:9].reshape((3, 3)), pose[9:12], pose[12:14], pose[14:16]
+
             # Screen space camera
-            F = F * min(img_size) / 2 
-            C = w / 2 - C[0] * min(img_size) / 2, h / 2 - C[1] * min(img_size) / 2  
+            F = F * min(img_size) / 2
+            C = w / 2 - C[0] * min(img_size) / 2, h / 2 - C[1] * min(img_size) / 2
 
             camera = PerspectiveCameras(
-                focal_length=torch.tensor(F, dtype=torch.float)[None], 
+                focal_length=torch.tensor(F, dtype=torch.float)[None],
                 principal_point=torch.tensor(C, dtype=torch.float)[None],
-                R=torch.tensor(R, dtype=torch.float)[None], 
+                R=torch.tensor(R, dtype=torch.float)[None],
                 T=torch.tensor(T, dtype=torch.float)[None],
                 in_ndc=False,
-                image_size=((h,w),)
+                image_size=((h, w),),
             )
 
             self.images.append(img)
@@ -115,6 +117,7 @@ def colour_depth_q1_render(depth):
 
     return coloured_depth
 
+
 def visualize_renders(scene, gt_viz_img, cameras, img_size):
 
     imgs = []
@@ -122,7 +125,8 @@ def visualize_renders(scene, gt_viz_img, cameras, img_size):
     with torch.no_grad():
         for cam in cameras:
             pred_img, _, _ = scene.render(
-                cam, img_size=img_size,
+                cam,
+                img_size=img_size,
                 bg_colour=(0.0, 0.0, 0.0),
                 per_splat=-1,
             )
@@ -138,13 +142,19 @@ def visualize_renders(scene, gt_viz_img, cameras, img_size):
     viz_frame = np.concatenate((pred_viz_img, gt_viz_img), axis=0)
     return viz_frame
 
+
 def load_gaussians_from_ply(path):
     # Modified from https://github.com/thomasantony/splat
     max_sh_degree = 3
     plydata = PlyData.read(path)
-    xyz = np.stack((np.asarray(plydata.elements[0]["x"]),
-                    np.asarray(plydata.elements[0]["y"]),
-                    np.asarray(plydata.elements[0]["z"])),  axis=1)
+    xyz = np.stack(
+        (
+            np.asarray(plydata.elements[0]["x"]),
+            np.asarray(plydata.elements[0]["y"]),
+            np.asarray(plydata.elements[0]["z"]),
+        ),
+        axis=1,
+    )
     opacities = np.asarray(plydata.elements[0]["opacity"])[..., np.newaxis]
 
     features_dc = np.zeros((xyz.shape[0], 3, 1))
@@ -152,24 +162,32 @@ def load_gaussians_from_ply(path):
     features_dc[:, 1, 0] = np.asarray(plydata.elements[0]["f_dc_1"])
     features_dc[:, 2, 0] = np.asarray(plydata.elements[0]["f_dc_2"])
 
-    extra_f_names = [p.name for p in plydata.elements[0].properties if p.name.startswith("f_rest_")]
-    extra_f_names = sorted(extra_f_names, key = lambda x: int(x.split('_')[-1]))
+    extra_f_names = [
+        p.name for p in plydata.elements[0].properties if p.name.startswith("f_rest_")
+    ]
+    extra_f_names = sorted(extra_f_names, key=lambda x: int(x.split("_")[-1]))
     assert len(extra_f_names) == 3 * (max_sh_degree + 1) ** 2 - 3
     features_extra = np.zeros((xyz.shape[0], len(extra_f_names)))
     for idx, attr_name in enumerate(extra_f_names):
         features_extra[:, idx] = np.asarray(plydata.elements[0][attr_name])
     # Reshape (P,F*SH_coeffs) to (P, F, SH_coeffs except DC)
-    features_extra = features_extra.reshape((features_extra.shape[0], 3, (max_sh_degree + 1) ** 2 - 1))
+    features_extra = features_extra.reshape(
+        (features_extra.shape[0], 3, (max_sh_degree + 1) ** 2 - 1)
+    )
     features_extra = np.transpose(features_extra, [0, 2, 1])
 
-    scale_names = [p.name for p in plydata.elements[0].properties if p.name.startswith("scale_")]
-    scale_names = sorted(scale_names, key = lambda x: int(x.split('_')[-1]))
+    scale_names = [
+        p.name for p in plydata.elements[0].properties if p.name.startswith("scale_")
+    ]
+    scale_names = sorted(scale_names, key=lambda x: int(x.split("_")[-1]))
     scales = np.zeros((xyz.shape[0], len(scale_names)))
     for idx, attr_name in enumerate(scale_names):
         scales[:, idx] = np.asarray(plydata.elements[0][attr_name])
 
-    rot_names = [p.name for p in plydata.elements[0].properties if p.name.startswith("rot")]
-    rot_names = sorted(rot_names, key = lambda x: int(x.split('_')[-1]))
+    rot_names = [
+        p.name for p in plydata.elements[0].properties if p.name.startswith("rot")
+    ]
+    rot_names = sorted(rot_names, key=lambda x: int(x.split("_")[-1]))
     rots = np.zeros((xyz.shape[0], len(rot_names)))
     for idx, attr_name in enumerate(rot_names):
         rots[:, idx] = np.asarray(plydata.elements[0][attr_name])
@@ -178,20 +196,25 @@ def load_gaussians_from_ply(path):
     rots = rots.astype(np.float32)
     scales = scales.astype(np.float32)
     opacities = opacities.astype(np.float32)
-    shs = np.concatenate([
-        features_dc.reshape(-1, 3),
-        features_extra.reshape(len(features_dc), -1)
-    ], axis=-1).astype(np.float32)
+    shs = np.concatenate(
+        [features_dc.reshape(-1, 3), features_extra.reshape(len(features_dc), -1)],
+        axis=-1,
+    ).astype(np.float32)
     shs = shs.astype(np.float32)
 
     dc_vals = shs[:, :3]
     dc_colours = np.maximum(dc_vals * SH_C0 + 0.5, np.zeros_like(dc_vals))
 
     output = {
-        "xyz": xyz, "rot": rots, "scale": scales,
-        "sh": shs, "opacity": opacities, "dc_colours": dc_colours
+        "xyz": xyz,
+        "rot": rots,
+        "scale": scales,
+        "sh": shs,
+        "opacity": opacities,
+        "dc_colours": dc_colours,
     }
     return output
+
 
 def colours_from_spherical_harmonics(spherical_harmonics, gaussian_dirs):
     """

@@ -1,6 +1,6 @@
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
-import torch.nn as nn 
 
 
 class HarmonicEmbedding(torch.nn.Module):
@@ -104,29 +104,33 @@ class ColorField(torch.nn.Module):
 
         embedding_dim_xyz = self.harmonic_embedding_xyz.output_dim
 
-        self.mlpWithInputSkip = MLPWithInputSkips(n_layers=6, input_dim=embedding_dim_xyz, output_dim=128, skip_dim=embedding_dim_xyz, hidden_dim=128, input_skips=[3])
-        
-        self.density_output_layer = nn.Linear(128, 1+128) # no activation
+        self.mlpWithInputSkip = MLPWithInputSkips(
+            n_layers=6,
+            input_dim=embedding_dim_xyz,
+            output_dim=128,
+            skip_dim=embedding_dim_xyz,
+            hidden_dim=128,
+            input_skips=[3],
+        )
 
+        self.density_output_layer = nn.Linear(128, 1 + 128)  # no activation
 
         rgb_output_input_dim = 128
 
         self.rgb_output_layer = nn.Sequential(
             nn.Linear(rgb_output_input_dim, 64),
             nn.ReLU(True),
-            nn.Linear(64, 3), # output RGB
+            nn.Linear(64, 3),  # output RGB
             nn.Sigmoid(),
         )
 
-
     def forward(self, sample_points):
-
         """
         Create a color field that takes in sampled points (vertices of the mesh) and outputs the color of the mesh at those points.
         """
         # the model takes in a RayBundle object in its forward method, and produce color and density for each sample point in the RayBundle.
         xyz_embed = self.harmonic_embedding_xyz(sample_points)
-      
+
         x = self.mlpWithInputSkip(xyz_embed, xyz_embed)
         x = self.density_output_layer(x)
         # x shape [131072, 129], dir_embed shape [131072, 15], sample_directions shape [131072, 3], sample_points shape [131072, 3]
@@ -137,12 +141,12 @@ class ColorField(torch.nn.Module):
 class NeuralRadianceField(torch.nn.Module):
     def __init__(
         self,
-        n_harmonic_functions_xyz = 6,
-        n_harmonic_functions_dir = 2,
-        n_layers_xyz = 6, 
-        n_hidden_neurons_xyz = 128,
-        append_xyz = [3],
-        n_hidden_neurons_dir = 64
+        n_harmonic_functions_xyz=6,
+        n_harmonic_functions_dir=2,
+        n_layers_xyz=6,
+        n_hidden_neurons_xyz=128,
+        append_xyz=[3],
+        n_hidden_neurons_dir=64,
     ):
         super().__init__()
 
@@ -152,26 +156,38 @@ class NeuralRadianceField(torch.nn.Module):
         embedding_dim_xyz = self.harmonic_embedding_xyz.output_dim
         embedding_dim_dir = self.harmonic_embedding_dir.output_dim
 
-        self.mlpWithInputSkip = MLPWithInputSkips(n_layers=n_layers_xyz, input_dim=embedding_dim_xyz, output_dim=n_hidden_neurons_xyz, skip_dim=embedding_dim_xyz, hidden_dim=n_hidden_neurons_xyz, input_skips=append_xyz)
-        
-        self.density_output_layer = nn.Linear(n_hidden_neurons_xyz, 1+n_hidden_neurons_xyz) # no activation
+        self.mlpWithInputSkip = MLPWithInputSkips(
+            n_layers=n_layers_xyz,
+            input_dim=embedding_dim_xyz,
+            output_dim=n_hidden_neurons_xyz,
+            skip_dim=embedding_dim_xyz,
+            hidden_dim=n_hidden_neurons_xyz,
+            input_skips=append_xyz,
+        )
+
+        self.density_output_layer = nn.Linear(
+            n_hidden_neurons_xyz, 1 + n_hidden_neurons_xyz
+        )  # no activation
 
         self.view_dependence = True
-        rgb_output_input_dim = n_hidden_neurons_xyz+embedding_dim_dir if self.view_dependence else n_hidden_neurons_xyz
+        rgb_output_input_dim = (
+            n_hidden_neurons_xyz + embedding_dim_dir
+            if self.view_dependence
+            else n_hidden_neurons_xyz
+        )
 
         self.rgb_output_layer = nn.Sequential(
             # nn.Linear(256+embedding_dim_dir, 128),
             nn.Linear(rgb_output_input_dim, n_hidden_neurons_dir),
             nn.ReLU(True),
-            nn.Linear(n_hidden_neurons_dir, 3), # output RGB
+            nn.Linear(n_hidden_neurons_dir, 3),  # output RGB
             nn.Sigmoid(),
         )
-
 
     def forward(self, ray_bundle):
         # the model takes in a RayBundle object in its forward method, and produce color and density for each sample point in the RayBundle.
         sample_points = ray_bundle.sample_points.view(-1, 3)
-        sample_directions = ray_bundle.directions.view(-1, 3) 
+        sample_directions = ray_bundle.directions.view(-1, 3)
         # repeat directions by cfg.n_pts_per_ray times
         n_pts_per_ray = sample_points.shape[0] // sample_directions.shape[0]
         sample_directions = sample_directions.repeat_interleave(n_pts_per_ray, dim=0)
@@ -180,14 +196,11 @@ class NeuralRadianceField(torch.nn.Module):
         x = self.mlpWithInputSkip(xyz_embed, xyz_embed)
         x = self.density_output_layer(x)
         density = F.relu(x[..., 0])
-    
+
         if self.view_dependence:
             rgb = self.rgb_output_layer(torch.cat((x[..., 1:], dir_embed), dim=-1))
         else:
             rgb = self.rgb_output_layer(x[..., 1:])
-        out = {
-            'density': density,
-            'feature': rgb
-        }
+        out = {"density": density, "feature": rgb}
 
         return out

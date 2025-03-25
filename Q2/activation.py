@@ -1,6 +1,8 @@
 import torch
 from torch.autograd import Function
-from torch.cuda.amp import custom_bwd, custom_fwd 
+from torch.cuda.amp import custom_bwd
+from torch.cuda.amp import custom_fwd
+
 
 class _trunc_exp(Function):
     @staticmethod
@@ -15,7 +17,9 @@ class _trunc_exp(Function):
         x = ctx.saved_tensors[0]
         return g * torch.exp(x.clamp(max=15))
 
+
 trunc_exp = _trunc_exp.apply
+
 
 def biased_softplus(x, bias=0):
     return torch.nn.functional.softplus(x - bias)

@@ -8,16 +8,13 @@ import torch.nn as nn
 from PIL import Image
 from SDS import SDS
 from tqdm import tqdm
-from utils import get_cosine_schedule_with_warmup, prepare_embeddings, seed_everything
+from utils import get_cosine_schedule_with_warmup
+from utils import prepare_embeddings
+from utils import seed_everything
 
 
 def optimize_an_image(
-    sds,
-    prompt,
-    neg_prompt="",
-    img=None,
-    log_interval=100,
-    args=None
+    sds, prompt, neg_prompt="", img=None, log_interval=100, args=None
 ):
     """
     Optimize an image to match the prompt.
@@ -39,12 +36,14 @@ def optimize_an_image(
     for i in tqdm(range(total_iter)):
         optimizer.zero_grad()
         # Forward pass to compute the loss
-        
+
         ### YOUR CODE HERE ###
         if args.sds_guidance:
-            loss = 
+            # loss =
+            pass
         else:
-            loss = 
+            # loss =
+            pass
 
         # Backward pass
         loss.backward()
@@ -73,7 +72,13 @@ if __name__ == "__main__":
     parser.add_argument("--prompt", type=str, default="a hamburger")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output_dir", type=str, default="output")
-    parser.add_argument("--sds_guidance", type=int, default=0, choices=[0, 1], help="boolen option to add guidance to the SDS loss")
+    parser.add_argument(
+        "--sds_guidance",
+        type=int,
+        default=0,
+        choices=[0, 1],
+        help="boolen option to add guidance to the SDS loss",
+    )
     parser.add_argument(
         "--postfix",
         type=str,

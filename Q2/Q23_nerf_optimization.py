@@ -13,7 +13,8 @@ from nerf.provider import NeRFDataset
 from optimizer import Adan
 from PIL import Image
 from SDS import SDS
-from utils import prepare_embeddings, seed_everything
+from utils import prepare_embeddings
+from utils import seed_everything
 
 
 def optimize_nerf(
@@ -162,10 +163,9 @@ def optimize_nerf(
                 ### YOUR CODE HERE ###
                 pass
 
-  
             ### YOUR CODE HERE ###
-            latents = 
-            loss = 
+            # latents =
+            # loss =
 
             # regularizations
             if args.lambda_entropy > 0:
@@ -301,11 +301,19 @@ if __name__ == "__main__":
     ### YOUR CODE HERE ###
     # You wil need to tune the following parameters to obtain good NeRF results
     ### regularizations
-    parser.add_argument('--lambda_entropy', type=float, default=0, help="loss scale for alpha entropy")
-    parser.add_argument('--lambda_orient', type=float, default=0, help="loss scale for orientation")
+    parser.add_argument(
+        "--lambda_entropy", type=float, default=0, help="loss scale for alpha entropy"
+    )
+    parser.add_argument(
+        "--lambda_orient", type=float, default=0, help="loss scale for orientation"
+    )
     ### shading options
-    parser.add_argument('--latent_iter_ratio', type=float, default=0, help="training iters that only use albedo shading")
-
+    parser.add_argument(
+        "--latent_iter_ratio",
+        type=float,
+        default=0,
+        help="training iters that only use albedo shading",
+    )
 
     parser.add_argument(
         "--postfix", type=str, default="", help="Postfix for the output directory"
