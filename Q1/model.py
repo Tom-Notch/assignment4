@@ -454,7 +454,9 @@ class Scene:
         ### YOUR CODE HERE ###
         # HINT: You can use get the means of 3D Gaussians self.gaussians and calculate
         # the depth using the means and the camera
-        z_vals = None  # (N,)
+        means_3D = self.gaussians.means  # (N, 3)
+
+        z_vals = camera.get_world_to_view_transform().transform_points(means_3D)[..., 2]
 
         return z_vals
 
@@ -475,11 +477,20 @@ class Scene:
         Please refer to the README file for more details.
         """
         ### YOUR CODE HERE ###
-        idxs = None  # (N,)
+        valid_idxs = torch.nonzero(z_vals >= 0).squeeze()
 
-        return idxs
+        sorted_order = torch.argsort(z_vals[valid_idxs], descending=False)
+        idxs = valid_idxs[sorted_order]
 
-    def compute_alphas(self, opacities, means_2D, cov_2D, img_size):
+        return idxs.to(dtype=torch.int64, device=z_vals.device)
+
+    def compute_alphas(
+        self,
+        opacities: torch.Tensor,
+        means_2D: torch.Tensor,
+        cov_2D: torch.Tensor,
+        img_size: Tuple,
+    ):
         """
         Given some parameters of N ordered Gaussians, this function computes
         the alpha values.
@@ -511,18 +522,24 @@ class Scene:
 
         ### YOUR CODE HERE ###
         # HINT: Can you find a function in this file that can help?
-        cov_2D_inverse = None  # (N, 2, 2) TODO: Verify shape
+        cov_2D_inverse = self.gaussians.invert_cov_2D(
+            cov_2D
+        )  # (N, 2, 2) TODO: Verify shape
 
         ### YOUR CODE HERE ###
         # HINT: Can you find a function in this file that can help?
-        power = None  # (N, H*W)
+        power = self.gaussians.evaluate_gaussian_2D(
+            points_2D,
+            means_2D,
+            cov_2D_inverse,
+        )  # (N, H*W)
 
         # Computing exp(power) with some post processing for numerical stability
-        exp_power = torch.where(power > 0.0, 0.0, torch.exp(power))
+        exp_power = torch.where(power > 0.0, 0.0, torch.exp(power))  # (N, H*W)
 
         ### YOUR CODE HERE ###
         # HINT: Refer to README for a relevant equation.
-        alphas = None  # (N, H*W)
+        alphas = opacities.unsqueeze(-1) * exp_power  # (N, H*W)
         alphas = torch.reshape(alphas, (-1, H, W))  # (N, H, W)
 
         # Post processing for numerical stability
@@ -573,7 +590,7 @@ class Scene:
 
         ### YOUR CODE HERE ###
         # HINT: Refer to README for a relevant equation.
-        transmittance = None  # (N, H, W)
+        transmittance = torch.cumprod(one_minus_alphas, dim=0)[:-1]  # (N, H, W)
 
         # Post processing for numerical stability
         transmittance = torch.where(
@@ -585,7 +602,7 @@ class Scene:
     def splat(
         self,
         camera: PerspectiveCameras,
-        means_3D: torch.tensor,
+        means_3D: torch.Tensor,
         z_vals: torch.Tensor,
         quats: torch.Tensor,
         scales: torch.Tensor,
@@ -629,27 +646,31 @@ class Scene:
 
         ### YOUR CODE HERE ###
         # HINT: Can you find a function in this file that can help?
-        means_2D = None  # (N, 2)
+        means_2D = self.gaussians.compute_means_2D(means_3D, camera)  # (N, 2)
 
         ### YOUR CODE HERE ###
         # HINT: Can you find a function in this file that can help?
-        cov_2D = None  # (N, 2, 2)
+        cov_2D = self.gaussians.compute_cov_2D(
+            means_3D, quats, scales, camera, img_size
+        )  # (N, 2, 2)
 
         # Step 2: Compute alpha maps for each gaussian
 
         ### YOUR CODE HERE ###
         # HINT: Can you find a function in this file that can help?
-        alphas = None  # (N, H, W)
+        alphas = self.compute_alphas(opacities, means_2D, cov_2D, img_size)  # (N, H, W)
 
         # Step 3: Compute transmittance maps for each gaussian
 
         ### YOUR CODE HERE ###
         # HINT: Can you find a function in this file that can help?
-        transmittance = None  # (N, H, W)
+        transmittance = self.compute_transmittance(
+            alphas, start_transmittance
+        )  # (N, H, W)
 
         # Some unsqueezing to set up broadcasting for vectorized implementation.
         # You can selectively comment these out if you want to compute things
-        # in a diferent way.
+        # in a different way.
         z_vals = z_vals[:, None, None, None]  # (N, 1, 1, 1)
         alphas = alphas[..., None]  # (N, H, W, 1)
         colors = colors[:, None, None, :]  # (N, 1, 1, 3)
@@ -659,15 +680,15 @@ class Scene:
 
         ### YOUR CODE HERE ###
         # HINT: Refer to README for a relevant equation
-        image = None  # (H, W, 3)
+        image = (colors * alphas * transmittance).sum(dim=0)  # (H, W, 3)
 
         ### YOUR CODE HERE ###
         # HINT: Can you implement an equation inspired by the equation for color?
-        depth = None  # (H, W, 1)
+        depth = (z_vals * alphas * transmittance).sum(dim=0)  # (H, W, 1)
 
         ### YOUR CODE HERE ###
         # HINT: Can you implement an equation inspired by the equation for color?
-        mask = None  # (H, W, 1)
+        mask = (alphas * transmittance).sum(dim=0)  # (H, W, 1)
 
         final_transmittance = transmittance[-1, ..., 0].unsqueeze(0)  # (1, H, W)
         return image, depth, mask, final_transmittance
@@ -688,7 +709,7 @@ class Scene:
             camera      :   A pytorch3d PerspectiveCameras object.
             per_splat   :   Number of gaussians to splat in one function call. If set to -1,
                             then all gaussians in the scene are splat in a single function call.
-                            If set to any other positive interger, then it determines the number of
+                            If set to any other positive integer, then it determines the number of
                             gaussians to splat per function call (the last function call might splat
                             lesser number of gaussians). In general, the algorithm can run faster
                             if more gaussians are splat per function call, but at the cost of higher GPU
