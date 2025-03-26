@@ -5,6 +5,7 @@ import os
 import imageio
 import numpy as np
 import torch
+import torch.nn.functional as F
 from data_utils import TruckDataset
 from data_utils import visualize_renders
 from model import Gaussians
@@ -16,11 +17,13 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 
-def make_trainable(gaussians):
+def make_trainable(gaussians: Gaussians):
 
     ### YOUR CODE HERE ###
     # HINT: You can access and modify parameters from gaussians
-    pass
+    for attributes in vars(gaussians).values():
+        if isinstance(attributes, torch.Tensor):
+            attributes.requires_grad = True
 
 
 def setup_optimizer(gaussians):
@@ -35,12 +38,11 @@ def setup_optimizer(gaussians):
     # HINT: Consider setting different learning rates for different sets of parameters.
     parameters = [
         {"params": [gaussians.pre_act_opacities], "lr": 0.05, "name": "opacities"},
-        {"params": [gaussians.pre_act_scales], "lr": 0.05, "name": "scales"},
+        {"params": [gaussians.pre_act_scales], "lr": 0.01, "name": "scales"},
         {"params": [gaussians.colors], "lr": 0.05, "name": "colors"},
-        {"params": [gaussians.means], "lr": 0.05, "name": "means"},
+        {"params": [gaussians.means], "lr": 0.001, "name": "means"},
     ]
     optimizer = torch.optim.Adam(parameters, lr=0.0, eps=1e-15)
-    optimizer = None
 
     return optimizer
 
@@ -123,12 +125,17 @@ def run_training(args):
         # HINT: Get img_size from train_dataset
         # HINT: Get per_splat from args.gaussians_per_splat
         # HINT: camera is available above
-        pred_img = None
+        pred_img = scene.render(
+            camera,
+            args.gaussians_per_splat,
+            train_dataset.img_size,
+            (0.0, 0.0, 0.0),
+        )
 
         # Compute loss
         ### YOUR CODE HERE ###
         # HINT: A simple standard loss function should work.
-        loss = None
+        loss = F.l1_loss(pred_img[0][pred_img[-1]], gt_img[gt_mask])
 
         loss.backward()
         optimizer.step()
@@ -144,7 +151,7 @@ def run_training(args):
 
     print("[*] Training Completed.")
 
-    # Saving training progess GIF
+    # Saving training progress GIF
     imageio.mimwrite(viz_gif_path_1, viz_frames, loop=0, duration=(1 / 10.0) * 1000)
 
     # Creating renderings of the training views after training is completed.
@@ -173,7 +180,12 @@ def run_training(args):
             # HINT: Get img_size from train_dataset
             # HINT: Get per_splat from args.gaussians_per_splat
             # HINT: camera is available above
-            pred_img = None
+            pred_img = scene.render(
+                camera,
+                args.gaussians_per_splat,
+                train_dataset.img_size,
+                (0.0, 0.0, 0.0),
+            )
 
         pred_npy = pred_img.detach().cpu().numpy()
         pred_npy = (np.clip(pred_npy, 0.0, 1.0) * 255.0).astype(np.uint8)
@@ -201,7 +213,12 @@ def run_training(args):
             # HINT: Get img_size from test_dataset
             # HINT: Get per_splat from args.gaussians_per_splat
             # HINT: camera is available above
-            pred_img = None
+            pred_img = scene.render(
+                camera,
+                args.gaussians_per_splat,
+                test_dataset.img_size,
+                (0.0, 0.0, 0.0),
+            )
 
             gt_npy = gt_img.detach().cpu().numpy()
             pred_npy = pred_img.detach().cpu().numpy()
@@ -238,7 +255,7 @@ def get_args():
         help=(
             "Number of gaussians to splat in one function call. If set to -1, "
             "then all gaussians in the scene are splat in a single function call. "
-            "If set to any other positive interger, then it determines the number of "
+            "If set to any other positive integer, then it determines the number of "
             "gaussians to splat per function call (the last function call might splat "
             "lesser number of gaussians). In general, the algorithm can run faster "
             "if more gaussians are splat per function call, but at the cost of higher GPU "

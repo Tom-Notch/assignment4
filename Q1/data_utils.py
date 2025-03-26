@@ -144,7 +144,7 @@ def visualize_renders(scene, gt_viz_img, cameras, img_size):
     return viz_frame
 
 
-def load_gaussians_from_ply(path):
+def load_gaussians_from_ply(path: str) -> dict[str, np.ndarray]:
     # Modified from https://github.com/thomasantony/splat
     max_sh_degree = 3
     plydata = PlyData.read(path)
@@ -217,7 +217,10 @@ def load_gaussians_from_ply(path):
     return output
 
 
-def colors_from_spherical_harmonics(spherical_harmonics, gaussian_dirs):
+def colors_from_spherical_harmonics(
+    spherical_harmonics: torch.Tensor,
+    gaussian_dirs: torch.Tensor,
+) -> torch.Tensor:
     """
     [Q 1.3.1] Computes view-dependent color given spherical harmonic coefficients
     and direction vectors for each gaussian.

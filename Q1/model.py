@@ -83,10 +83,10 @@ class Gaussians:
         if self.device == "cuda":
             self.to_cuda()
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.means)
 
-    def _load_gaussians(self, ply_path: str):
+    def _load_gaussians(self, ply_path: str) -> Tuple[dict[str, torch.Tensor], bool]:
 
         data = dict()
         ply_gaussians = load_gaussians_from_ply(ply_path)
@@ -107,7 +107,7 @@ class Gaussians:
 
         return data, is_isotropic
 
-    def _load_points(self, path: str):
+    def _load_points(self, path: str) -> dict[str, torch.Tensor]:
 
         data = dict()
         means = np.load(path)
@@ -142,7 +142,7 @@ class Gaussians:
 
         return data
 
-    def _load_random(self, num_points: int):
+    def _load_random(self, num_points: int) -> dict[str, torch.Tensor]:
 
         data = dict()
 
@@ -175,7 +175,7 @@ class Gaussians:
 
     def _compute_jacobian(
         self, means_3D: torch.Tensor, camera: PerspectiveCameras, img_size: Tuple
-    ):
+    ) -> torch.Tensor:
 
         if camera.in_ndc():
             raise RuntimeError
@@ -210,7 +210,7 @@ class Gaussians:
 
         return J  # (N, 2, 3)
 
-    def check_if_trainable(self):
+    def check_if_trainable(self) -> None:
 
         attrs = ["means", "pre_act_scales", "colors", "pre_act_opacities"]
         if not self.is_isotropic:
@@ -228,7 +228,7 @@ class Gaussians:
                 "You do not need to optimize quaternions in isotropic mode."
             )
 
-    def to_cuda(self):
+    def to_cuda(self) -> None:
 
         self.pre_act_quats = self.pre_act_quats.cuda()
         self.means = self.means.cuda()
@@ -239,7 +239,7 @@ class Gaussians:
         # [Q 1.3.1] NOTE: Uncomment spherical harmonics code for question 1.3.1
         # self.spherical_harmonics = self.spherical_harmonics.cuda()
 
-    def compute_cov_3D(self, quats: torch.Tensor, scales: torch.Tensor):
+    def compute_cov_3D(self, quats: torch.Tensor, scales: torch.Tensor) -> torch.Tensor:
         """
         Computes the covariance matrices of 3D Gaussians using equation (6) of the 3D
         Gaussian Splatting paper.
@@ -294,7 +294,7 @@ class Gaussians:
         scales: torch.Tensor,
         camera: PerspectiveCameras,
         img_size: Tuple,
-    ):
+    ) -> torch.Tensor:
         """
         Computes the covariance matrices of 2D Gaussians using equation (5) of the 3D
         Gaussian Splatting paper.
@@ -342,7 +342,9 @@ class Gaussians:
         return cov_2D
 
     @staticmethod
-    def compute_means_2D(means_3D: torch.Tensor, camera: PerspectiveCameras):
+    def compute_means_2D(
+        means_3D: torch.Tensor, camera: PerspectiveCameras
+    ) -> torch.Tensor:
         """
         Computes the means of the projected 2D Gaussians given the means of the 3D Gaussians.
 
@@ -362,7 +364,7 @@ class Gaussians:
         return means_2D
 
     @staticmethod
-    def invert_cov_2D(cov_2D: torch.Tensor):
+    def invert_cov_2D(cov_2D: torch.Tensor) -> torch.Tensor:
         """
         Using the formula for inverse of a 2D matrix to invert the cov_2D matrix
 
@@ -390,7 +392,7 @@ class Gaussians:
     @staticmethod
     def evaluate_gaussian_2D(
         points_2D: torch.Tensor, means_2D: torch.Tensor, cov_2D_inverse: torch.Tensor
-    ):
+    ) -> torch.Tensor:
         """
         Computes the exponent (power) of 2D Gaussians.
 
@@ -418,7 +420,11 @@ class Gaussians:
         return power.squeeze()  # (N, H*W)
 
     @staticmethod
-    def apply_activations(pre_act_quats, pre_act_scales, pre_act_opacities):
+    def apply_activations(
+        pre_act_quats: torch.Tensor,
+        pre_act_scales: torch.Tensor,
+        pre_act_opacities: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
 
         # Convert log scales to scales
         scales = torch.exp(pre_act_scales)
@@ -438,10 +444,10 @@ class Scene:
         self.gaussians = gaussians
         self.device = self.gaussians.device
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Scene with {len(self.gaussians)} Gaussians>"
 
-    def compute_depth_values(self, camera: PerspectiveCameras):
+    def compute_depth_values(self, camera: PerspectiveCameras) -> torch.Tensor:
         """
         Computes the depth value of each 3D Gaussian.
 
@@ -460,7 +466,7 @@ class Scene:
 
         return z_vals
 
-    def get_idxs_to_filter_and_sort(self, z_vals: torch.Tensor):
+    def get_idxs_to_filter_and_sort(self, z_vals: torch.Tensor) -> torch.Tensor:
         """
         Given depth values of Gaussians, return the indices to depth-wise sort
         Gaussians and at the same time remove invalid Gaussians.
@@ -490,7 +496,7 @@ class Scene:
         means_2D: torch.Tensor,
         cov_2D: torch.Tensor,
         img_size: Tuple,
-    ):
+    ) -> torch.Tensor:
         """
         Given some parameters of N ordered Gaussians, this function computes
         the alpha values.
@@ -550,7 +556,7 @@ class Scene:
 
     def compute_transmittance(
         self, alphas: torch.Tensor, start_transmittance: Optional[torch.Tensor] = None
-    ):
+    ) -> torch.Tensor:
         """
         Given the alpha values of N ordered Gaussians, this function computes
         the transmittance.
@@ -610,7 +616,7 @@ class Scene:
         opacities: torch.Tensor,
         img_size: Tuple = (256, 256),
         start_transmittance: Optional[torch.Tensor] = None,
-    ):
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Given N ordered (depth-sorted) 3D Gaussians (or equivalently in our case,
         the parameters of the 3D Gaussians like means, quats etc.), this function splats
@@ -699,7 +705,7 @@ class Scene:
         per_splat: int = -1,
         img_size: Tuple = (256, 256),
         bg_color: Tuple = (0.0, 0.0, 0.0),
-    ):
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Given a scene represented by N 3D Gaussians, this function renders the RGB
         color image, the depth map and the silhouette map that can be observed
@@ -807,7 +813,11 @@ class Scene:
 
         return image, depth, mask
 
-    def calculate_gaussian_directions(self, means_3D, camera):
+    def calculate_gaussian_directions(
+        self,
+        means_3D: torch.Tensor,
+        camera: PerspectiveCameras,
+    ) -> torch.Tensor:
         """
         [Q 1.3.1] Calculates the world frame direction vectors that point from the
         camera's origin to each 3D Gaussian.
