@@ -32,7 +32,9 @@ def optimize_nerf(
     """
 
     # Step 1. Create text embeddings from prompt
-    embeddings = prepare_embeddings(sds, prompt, neg_prompt, view_dependent=False)
+    embeddings = prepare_embeddings(
+        sds, prompt, neg_prompt, view_dependent=getattr(args, "view_dep_text", False)
+    )
 
     # Step 2. Set up NeRF model
     model = NeRFNetwork(args).to(device)
@@ -163,7 +165,14 @@ def optimize_nerf(
                 text_cond = embeddings["default"]
             else:
                 ### YOUR CODE HERE ###
-                pass
+                if -45 < azimuth <= 45:
+                    text_cond = embeddings["front"]
+                elif -135 < azimuth <= -45:
+                    text_cond = embeddings["left"]
+                elif 45 < azimuth <= 135:
+                    text_cond = embeddings["right"]
+                else:
+                    text_cond = embeddings["back"]
 
             ### YOUR CODE HERE ###
             latents = sds.encode_imgs(
@@ -322,8 +331,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--view_dep_text",
-        type=int,
-        default=0,
+        action="store_true",
         help="option to use view dependent text embeddings for nerf optimization",
     )
     parser = add_config_arguments(

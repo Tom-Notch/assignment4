@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import math
 import os
 
 import imageio
@@ -12,6 +13,20 @@ from pytorch3d.renderer.cameras import PerspectiveCameras
 from torch.utils.data import Dataset
 
 SH_C0 = 0.28209479177387814
+SH_C1 = 0.4886025119029199
+SH_C2_0 = 1.0925484305920792
+SH_C2_1 = -1.0925484305920792
+SH_C2_2 = 0.31539156525252005
+SH_C2_3 = -1.0925484305920792
+SH_C2_4 = 0.5462742152960396
+SH_C3_0 = -0.5900435899266435
+SH_C3_1 = 2.890611442640554
+SH_C3_2 = -0.4570457994644658
+SH_C3_3 = 0.3731763325901154
+SH_C3_4 = -0.4570457994644658
+SH_C3_5 = 1.445305721320277
+SH_C3_6 = -0.5900435899266435
+
 CMAP_JET = plt.get_cmap("jet")
 CMAP_MIN_NORM, CMAP_MAX_NORM = 5.0, 7.0
 
@@ -217,6 +232,121 @@ def load_gaussians_from_ply(path: str) -> dict[str, np.ndarray]:
     return output
 
 
+def check_sh_coefficients(num_coefficients: int, l_max: int = 3) -> bool:
+    """
+    Verifies that num_coefficients matches the expected number of spherical harmonic basis functions
+    up to order l_max. For l_max=3, we expect 1 + 3 + 5 + 7 = 16 coefficients.
+
+    Args:
+        num_coefficients: Number of coefficients per channel.
+        l_max: Maximum spherical harmonic order (default 3).
+
+    Returns:
+        True if valid, otherwise raises an AssertionError.
+    """
+    expected = sum(2 * l + 1 for l in range(l_max + 1))
+    assert (
+        num_coefficients == expected
+    ), f"Expected {expected} coefficients, got {num_coefficients}"
+
+    return True
+
+
+def sh_constant(l: int, m: int) -> float:
+    """
+    Compute the normalization constant for the real spherical harmonic of degree l and order m.
+
+    The normalization is given by:
+      K(l, m) = sqrt((2l+1)/(4π) * ((l-|m|)!/(l+|m|)!))
+    and for m ≠ 0, we multiply by sqrt(2).
+
+    Args:
+        l (int): Degree (non-negative integer).
+        m (int): Order (can be negative, with |m| ≤ l).
+
+    Returns:
+        float: The normalization constant.
+    """
+    assert l >= 0, f"l must be non-negative, got {l}"
+    assert abs(m) <= l, f"|m| must <= l, got m = {m} and l = {l}"
+
+    m_abs = abs(m)
+    K = math.sqrt(
+        (2 * l + 1)
+        / (4 * math.pi)
+        * math.factorial(l - m_abs)
+        / math.factorial(l + m_abs)
+    )
+    if m != 0:
+        K *= math.sqrt(2)
+    return K
+
+
+def generate_sh_basis(gaussian_dirs: torch.Tensor) -> torch.Tensor:
+    """
+    Compute canonical real spherical harmonic basis functions up to l=3 for each direction.
+
+    Args:
+        gaussian_dirs: Tensor of shape (N, 3) with unit directions (x, y, z).
+
+    Returns:
+        basis: Tensor of shape (N, 16) where each row contains the 16 real spherical harmonics.
+    """
+    x = gaussian_dirs[..., 0]
+    y = gaussian_dirs[..., 1]
+    z = gaussian_dirs[..., 2]
+
+    # ! I don't think these constants are correct, look at the sh_constant function
+    # ! these constants below must be some hacky implementation that can only work for some particular pre-trained 3DGS
+
+    # l = 0
+    Y0_0 = SH_C0 * torch.ones_like(x)  # l=0
+
+    # l = 1
+    Y1_neg1 = SH_C1 * y
+    Y1_0 = SH_C1 * z
+    Y1_1 = SH_C1 * x
+
+    # l = 2
+    Y2_neg2 = SH_C2_0 * x * y
+    Y2_neg1 = SH_C2_1 * y * z
+    Y2_0 = SH_C2_2 * (2 * z * z - x * x - y * y)
+    Y2_1 = SH_C2_3 * x * z
+    Y2_2 = SH_C2_4 * (x * x - y * y)
+
+    # l = 3
+    Y3_neg3 = SH_C3_0 * y * (3 * x * x - y * y)
+    Y3_neg2 = SH_C3_1 * x * y * z
+    Y3_neg1 = SH_C3_2 * y * (4 * z * z - x * x - y * y)
+    Y3_0 = SH_C3_3 * z * (2 * z * z - 3 * x * x - 3 * y * y)
+    Y3_1 = SH_C3_4 * x * (4 * z * z - x * x - y * y)
+    Y3_2 = SH_C3_5 * z * (x * x - y * y)
+    Y3_3 = SH_C3_6 * x * (x * x - 3 * y * y)
+
+    basis = torch.stack(
+        [
+            Y0_0,
+            Y1_neg1,
+            Y1_0,
+            Y1_1,
+            Y2_neg2,
+            Y2_neg1,
+            Y2_0,
+            Y2_1,
+            Y2_2,
+            Y3_neg3,
+            Y3_neg2,
+            Y3_neg1,
+            Y3_0,
+            Y3_1,
+            Y3_2,
+            Y3_3,
+        ],
+        dim=-1,
+    )
+    return basis
+
+
 def colors_from_spherical_harmonics(
     spherical_harmonics: torch.Tensor,
     gaussian_dirs: torch.Tensor,
@@ -237,5 +367,10 @@ def colors_from_spherical_harmonics(
                                     RGB color.
     """
     ### YOUR CODE HERE ###
-    colors = None
+    N = spherical_harmonics.shape[0]
+    _spherical_harmonics = spherical_harmonics.view(N, -1, 3).transpose(-1, -2)
+    check_sh_coefficients(_spherical_harmonics.shape[-1])
+
+    basis = generate_sh_basis(gaussian_dirs)
+    colors = (_spherical_harmonics * basis.unsqueeze(1)).sum(dim=-1)
     return colors
