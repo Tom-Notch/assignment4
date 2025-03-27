@@ -45,7 +45,7 @@ def optimize_mesh_texture(
     vertices = vertices.unsqueeze(0).to(device)  # (N_v, 3) -> (1, N_v, 3)
     faces = faces.unsqueeze(0).to(device)  # (N_f, 3) -> (1, N_f, 3)
 
-    # Step 2.1 Initialize a randome texture map (optimizable parameter)
+    # Step 2.1 Initialize a random texture map (optimizable parameter)
     # create a texture field with implicit function
     color_field = ColorField().to(device)  # input (1, N_v, xyz) -> output (1, N_v, rgb)
     mesh = pytorch3d.structures.Meshes(

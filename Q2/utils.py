@@ -140,7 +140,7 @@ def init_mesh(
     return mesh, verts, faces, aux
 
 
-# calculate the text embs.
+# calculate the text embeddings.
 @torch.no_grad()
 def prepare_embeddings(sds, prompt, neg_prompt="", view_dependent=False):
     # text embeddings (stable-diffusion)

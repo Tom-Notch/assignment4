@@ -40,11 +40,21 @@ def optimize_an_image(
 
         ### YOUR CODE HERE ###
         if args.sds_guidance:
-            # loss =
-            pass
+            loss = sds.sds_loss(
+                latents,
+                embeddings["default"],
+                embeddings["uncond"],
+                getattr(args, "guidance_scale", 100),
+                getattr(args, "gradient_scale", 1),
+            )
         else:
-            # loss =
-            pass
+            loss = sds.sds_loss(
+                latents,
+                embeddings["default"],
+                None,
+                getattr(args, "guidance_scale", 100),
+                getattr(args, "gradient_scale", 1),
+            )
 
         # Backward pass
         loss.backward()
@@ -75,10 +85,20 @@ if __name__ == "__main__":
     parser.add_argument("--output_dir", type=str, default="output")
     parser.add_argument(
         "--sds_guidance",
-        type=int,
-        default=0,
-        choices=[0, 1],
-        help="boolen option to add guidance to the SDS loss",
+        action="store_true",
+        help="boolean option to add guidance to the SDS loss",
+    )
+    parser.add_argument(
+        "--guidance_scale",
+        type=float,
+        default=100.0,
+        help="guidance scale factor for SDS loss (only used if sds_guidance is enabled)",
+    )
+    parser.add_argument(
+        "--gradient_scale",
+        type=float,
+        default=1.0,
+        help="gradient scaling factor for SDS loss",
     )
     parser.add_argument(
         "--postfix",

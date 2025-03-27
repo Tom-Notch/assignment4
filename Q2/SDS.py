@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from typing import List
+
 import torch
 import torch.nn.functional as F
 from diffusers import DDIMScheduler
@@ -12,17 +14,17 @@ class SDS:
 
     def __init__(
         self,
-        sd_version="2.1",
-        device="cpu",
-        t_range=[0.02, 0.98],
-        output_dir="output",
+        sd_version: str = "2.1",
+        device: str = "cpu",
+        t_range: List[float] = [0.02, 0.98],
+        output_dir: str = "output",
     ):
         """
         Load the Stable Diffusion model and set the parameters.
 
         Args:
             sd_version (str): version for stable diffusion model
-            device (_type_): _description_
+            device (str): torch device
         """
 
         # Set the stable diffusion model key based on the version
@@ -65,7 +67,7 @@ class SDS:
         print(f"[INFO] loaded stable diffusion!")
 
     @torch.no_grad()
-    def get_text_embeddings(self, prompt):
+    def get_text_embeddings(self, prompt: List[str]) -> torch.Tensor:
         """
         Get the text embeddings for the prompt.
 
@@ -121,12 +123,12 @@ class SDS:
 
     def sds_loss(
         self,
-        latents,
-        text_embeddings,
-        text_embeddings_uncond=None,
-        guidance_scale=100,
-        grad_scale=1,
-    ):
+        latents: torch.Tensor,
+        text_embeddings: torch.Tensor,
+        text_embeddings_uncond: torch.Tensor = None,
+        guidance_scale: int = 100,
+        gradient_scale: int = 1,
+    ) -> torch.Tensor:
         """
         Compute the SDS loss.
 
@@ -135,7 +137,7 @@ class SDS:
             text_embeddings (tensor): conditional text embedding (for positive prompt), shape [1, 77, 1024]
             text_embeddings_uncond (tensor, optional): unconditional text embedding (for negative prompt), shape [1, 77, 1024]. Defaults to None.
             guidance_scale (int, optional): weight scaling for guidance. Defaults to 100.
-            grad_scale (int, optional): gradient scaling. Defaults to 1.
+            gradient_scale (int, optional): gradient scaling. Defaults to 1.
 
         Returns:
             loss (tensor): SDS loss
@@ -153,15 +155,32 @@ class SDS:
         # predict the noise residual with unet, NO grad!
         with torch.no_grad():
             ### YOUR CODE HERE ###
+            noise = torch.randn_like(latents)
+
+            # z_t = sqrt(alpha_t) x z + sqrt(1 - alpha_t) x noise
+            latents_with_noise = self.scheduler.add_noise(latents, noise, t)
+
+            # conditional noise residual
+            noise_residual = self.unet(
+                latents_with_noise, t, encoder_hidden_states=text_embeddings
+            ).sample
 
             if text_embeddings_uncond is not None and guidance_scale != 1:
                 ### YOUR CODE HERE ###
-                pass
+                # unconditional noise residual
+                noise_residual_uncond = self.unet(
+                    latents_with_noise, t, encoder_hidden_states=text_embeddings_uncond
+                ).sample
+
+                noise_residual = noise_residual_uncond + guidance_scale * (
+                    noise_residual - noise_residual_uncond
+                )
 
         # Compute SDS loss
         w = 1 - self.alphas[t]
         ### YOUR CODE HERE ###
-
-        # loss =
+        gradient = gradient_scale * w * (noise_residual - noise)
+        target = (latents - gradient).detach()
+        loss = F.mse_loss(latents, target)
 
         return loss
