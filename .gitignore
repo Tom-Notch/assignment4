@@ -107,12 +107,12 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-build/
+**/build/
 develop-eggs/
 dist/
 downloads/
-eggs/
-.eggs/
+**/*eggs/
+**/*.eggs/
 lib/
 lib64/
 parts/
@@ -675,4 +675,4 @@ data/
 outputs/
 
 **/*.pth
-**/build/
+**/build
