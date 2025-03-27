@@ -673,3 +673,6 @@ checkpoints/
 data/
 
 outputs/
+
+**/*.pth
+**/build/

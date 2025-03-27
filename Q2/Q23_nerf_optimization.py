@@ -8,6 +8,7 @@ import time
 import imageio
 import numpy as np
 import torch
+import torch.nn.functional as F
 from nerf.config_parser import add_config_arguments
 from nerf.network_grid import NeRFNetwork
 from nerf.provider import NeRFDataset
@@ -19,11 +20,11 @@ from utils import seed_everything
 
 
 def optimize_nerf(
-    sds,
-    prompt,
-    neg_prompt="",
-    device="cpu",
-    log_interval=20,
+    sds: SDS,
+    prompt: str,
+    neg_prompt: str = "",
+    device: str = "cpu",
+    log_interval: int = 20,
     args=None,
 ):
     """
@@ -48,7 +49,7 @@ def optimize_nerf(
     )
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda iter: 1)
     if args.loss_scaling:
-        scaler = torch.cuda.amp.GradScaler()
+        scaler = torch.amp.GradScaler("cuda")
 
     # Step 4. Load the dataset
     train_loader = NeRFDataset(
@@ -74,7 +75,7 @@ def optimize_nerf(
     # create logging and saving directories
     checkpoint_path = osp.join(sds.output_dir, f"nerf_checkpoint.pth")
     os.makedirs(f"{sds.output_dir}/images", exist_ok=True)
-    os.makedirs(f"{sds.output_dir}/videos", exist_ok=True)
+    os.makedirs(f"{sds.output_dir}/gif", exist_ok=True)
 
     max_epoch = np.ceil(args.iters / len(train_loader)).astype(np.int32)
     for epoch in range(max_epoch):
@@ -152,7 +153,7 @@ def optimize_nerf(
                 outputs["image"].reshape(B, H, W, 3).permute(0, 3, 1, 2).contiguous()
             )  # [B, 3, H, W]
 
-            # Compuate the loss
+            # Compute the loss
             # interpolate text_z
             azimuth = data["azimuth"]  # [-180, 180]
             assert azimuth.shape[0] == 1, "Batch size should be 1"
@@ -165,10 +166,12 @@ def optimize_nerf(
                 pass
 
             ### YOUR CODE HERE ###
-            # latents =
-            # loss =
+            latents = sds.encode_imgs(
+                F.interpolate(pred_rgb, size=(512, 512), mode="bilinear")
+            )
+            loss = sds.sds_loss(latents, text_cond, text_uncond)
 
-            # regularizations
+            # regularization
             if args.lambda_entropy > 0:
                 alphas = outputs["weights"].clamp(1e-5, 1 - 1e-5)
                 # alphas = alphas ** 2 # skewed entropy, favors 0 over 1
@@ -275,20 +278,18 @@ def optimize_nerf(
                     all_preds_depth.append(pred_depth)
             all_preds = np.stack(all_preds, axis=0)
             all_preds_depth = np.stack(all_preds_depth, axis=0)
-            # save the video
+            # save the gif
             imageio.mimwrite(
-                os.path.join(sds.output_dir, "videos", f"rgb_ep_{epoch}.mp4"),
+                os.path.join(sds.output_dir, "gif", f"rgb_ep_{epoch}.gif"),
                 all_preds,
-                fps=25,
-                quality=8,
-                macro_block_size=1,
+                loop=0,
+                duration=(1 / 10.0) * 1000,
             )
             imageio.mimwrite(
-                os.path.join(sds.output_dir, "videos", f"depth_ep_{epoch}.mp4"),
+                os.path.join(sds.output_dir, "gif", f"depth_ep_{epoch}.gif"),
                 all_preds_depth,
-                fps=25,
-                quality=8,
-                macro_block_size=1,
+                loop=0,
+                duration=(1 / 10.0) * 1000,
             )
 
 
@@ -300,8 +301,8 @@ if __name__ == "__main__":
     parser.add_argument("--loss_scaling", type=int, default=1)
 
     ### YOUR CODE HERE ###
-    # You wil need to tune the following parameters to obtain good NeRF results
-    ### regularizations
+    # You will need to tune the following parameters to obtain good NeRF results
+    ### regularization
     parser.add_argument(
         "--lambda_entropy", type=float, default=0, help="loss scale for alpha entropy"
     )

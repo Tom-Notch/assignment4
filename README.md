@@ -12,6 +12,13 @@
   - [PyMCubes](https://github.com/pmneila/PyMCubes)
   - transformers
   - accelerate
+  - pandas
+  - opencv-python
+  - tensorboardX
+  - rich
+  - torch_ema
+  - torchmetrics
+  - imageio-ffmpeg
 
 - Feel free to install other packages if required.
 

@@ -57,7 +57,7 @@ def sample_pdf(bins, weights, n_samples, det=False):
     return samples
 
 
-@torch.cuda.amp.autocast(enabled=False)
+@torch.amp.autocast("cuda", enabled=False)
 def near_far_from_bound(rays_o, rays_d, bound, type="cube", min_near=0.05):
     # rays: [B, N, 3], [B, N, 3]
     # bound: int, radius for ball or half-edge-length for cube
@@ -122,7 +122,7 @@ def compute_edge_to_face_mapping(attr_idx):
         return tris_per_edge
 
 
-@torch.cuda.amp.autocast(enabled=False)
+@torch.amp.autocast("cuda", enabled=False)
 def normal_consistency(face_normals, t_pos_idx):
 
     tris_per_edge = compute_edge_to_face_mapping(t_pos_idx)
@@ -161,7 +161,7 @@ def laplacian_uniform(verts, faces):
     return torch.sparse_coo_tensor(idx, values, (V, V)).coalesce()
 
 
-@torch.cuda.amp.autocast(enabled=False)
+@torch.amp.autocast("cuda", enabled=False)
 def laplacian_smooth_loss(verts, faces):
     with torch.no_grad():
         L = laplacian_uniform(verts, faces.long())

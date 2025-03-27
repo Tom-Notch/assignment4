@@ -83,7 +83,7 @@ def safe_normalize(x, eps=1e-20):
     return x / torch.sqrt(torch.clamp(torch.sum(x * x, -1, keepdim=True), min=eps))
 
 
-@torch.cuda.amp.autocast(enabled=False)
+@torch.amp.autocast("cuda", enabled=False)
 def get_rays(poses, intrinsics, H, W, N=-1, error_map=None):
     """get rays
     Args:
