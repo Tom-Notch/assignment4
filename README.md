@@ -10,6 +10,8 @@
   - [nvdiffrast](https://nvlabs.github.io/nvdiffrast/)
   - [pymeshlab](https://github.com/cnr-isti-vclab/PyMeshLab)
   - [PyMCubes](https://github.com/pmneila/PyMCubes)
+  - transformers
+  - accelerate
 
 - Feel free to install other packages if required.
 
@@ -334,7 +336,7 @@ In the original paper of [DreamFusion](https://arxiv.org/pdf/2209.14988.pdf), th
 
 - One of the tricks is additional regularization terms in the loss function. (Sec. 3.1 and A.2 in the original paper). The regularization terms are already implemented for you; however, they are disabled (weight=0) by default. Tune the loss weight hyperparameters `lambda_entropy` and `lambda_orient` so that you get reasonable results for NeRF optimization. (*Hint*: try something small such as 1e-3, 1e-2, 1e-1, etc.)
 
-- Another trick that significantly improves the geometry of NeRF model is that instead of directly modeling the RGB color appearance, the neural field models the albedo and renders the lambertian surface given the lighting condition and surface normal. In the training loop, implementation of different shading methods is provided. You will need to tune the parameter `latent_iter_ratio` so that the model uses `normal` shading at the beginning as a warmup then switches to "random" shading between `textureless` and `lambertian`. The default value is set to be `latent_iter_ratio=0` (*Hint*: try something in range \[0, 1\] such as 0.1, 0.2, 0.5 etc.)
+- Another trick that significantly improves the geometry of NeRF model is that instead of directly modeling the RGB color appearance, the neural field models the albedo and renders the lambertian surface given the lighting condition and surface normal. In the training loop, implementation of different shading methods is provided. You will need to tune the parameter `latent_iter_ratio` so that the model uses `normal` shading at the beginning as a warmup then switches to "random" shading between `textureless` and `lambertian`. The default value is set to be `latent_iter_ratio=0` (*Hint*: try something in range [0, 1] such as 0.1, 0.2, 0.5 etc.)
 
 You will need to tune the above-mentioned parameters to obtain good NeRF optimization results.
 

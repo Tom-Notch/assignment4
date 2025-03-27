@@ -23,7 +23,7 @@ from utils import seed_everything
 
 
 def optimize_mesh_texture(
-    sds,
+    sds: SDS,
     mesh_path,
     prompt,
     neg_prompt="",
@@ -97,11 +97,39 @@ def optimize_mesh_texture(
 
         # Forward pass
         # Render a randomly sampled camera view to optimize in this iteration
-        # rend =
+
+        # Sample a random camera pose on the fly
+        azim = np.random.uniform(0, 360)
+        elev = np.random.uniform(10, 80)
+        # Choose a random distance so that the mesh is in view
+        dist = np.random.uniform(2.0, 5.0)
+        R, T = look_at_view_transform(dist=dist, elev=elev, azim=azim)
+        cameras = FoVPerspectiveCameras(device=device, R=R, T=T)
+
+        # Sample random lighting condition:
+        # Random light position in a cube around the origin
+        light_location = torch.tensor(
+            [
+                [
+                    np.random.uniform(-3, 3),
+                    np.random.uniform(-3, 3),
+                    np.random.uniform(-3, 3),
+                ]
+            ],
+            device=device,
+        )
+        lights = pytorch3d.renderer.PointLights(location=light_location, device=device)
+        # Create a new renderer with the random lights
+        renderer = get_mesh_renderer_soft(image_size=512, device=device, lights=lights)
+
+        # Render!
+        rendered_image = renderer(mesh, cameras=cameras)[..., :3].permute(0, 3, 1, 2)
+
         # Encode the rendered image to latents
-        # latents =
-        # Compute the loss
-        # loss =
+        latents = sds.encode_imgs(rendered_image)
+
+        # Compute the loss, with guidance of course
+        loss = sds.sds_loss(latents, embeddings["default"], embeddings["uncond"])
 
         # Backward pass
         loss.backward()

@@ -21,9 +21,10 @@ def make_trainable(gaussians: Gaussians):
 
     ### YOUR CODE HERE ###
     # HINT: You can access and modify parameters from gaussians
-    for attributes in vars(gaussians).values():
-        if isinstance(attributes, torch.Tensor):
-            attributes.requires_grad = True
+    gaussians.colors.requires_grad = True
+    gaussians.means.requires_grad = True
+    gaussians.pre_act_opacities.requires_grad = True
+    gaussians.pre_act_scales.requires_grad = True
 
 
 def setup_optimizer(gaussians):
@@ -125,7 +126,7 @@ def run_training(args):
         # HINT: Get img_size from train_dataset
         # HINT: Get per_splat from args.gaussians_per_splat
         # HINT: camera is available above
-        pred_img = scene.render(
+        pred_img, pred_depth, pred_mask = scene.render(
             camera,
             args.gaussians_per_splat,
             train_dataset.img_size,
@@ -135,7 +136,7 @@ def run_training(args):
         # Compute loss
         ### YOUR CODE HERE ###
         # HINT: A simple standard loss function should work.
-        loss = F.l1_loss(pred_img[0][pred_img[-1]], gt_img[gt_mask])
+        loss = F.l1_loss(pred_img, gt_img)
 
         loss.backward()
         optimizer.step()
@@ -180,7 +181,7 @@ def run_training(args):
             # HINT: Get img_size from train_dataset
             # HINT: Get per_splat from args.gaussians_per_splat
             # HINT: camera is available above
-            pred_img = scene.render(
+            pred_img, pred_depth, pred_mask = scene.render(
                 camera,
                 args.gaussians_per_splat,
                 train_dataset.img_size,
@@ -213,7 +214,7 @@ def run_training(args):
             # HINT: Get img_size from test_dataset
             # HINT: Get per_splat from args.gaussians_per_splat
             # HINT: camera is available above
-            pred_img = scene.render(
+            pred_img, pred_depth, pred_mask = scene.render(
                 camera,
                 args.gaussians_per_splat,
                 test_dataset.img_size,

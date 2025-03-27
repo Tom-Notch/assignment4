@@ -70,11 +70,11 @@ class Gaussians:
         else:
             raise ValueError(f"Invalid init_type: {init_type}")
 
-        self.pre_act_quats = data["pre_act_quats"]
-        self.means = data["means"]
-        self.pre_act_scales = data["pre_act_scales"]
-        self.colors = data["colors"]
-        self.pre_act_opacities = data["pre_act_opacities"]
+        self.pre_act_quats: torch.Tensor = data["pre_act_quats"]
+        self.means: torch.Tensor = data["means"]
+        self.pre_act_scales: torch.Tensor = data["pre_act_scales"]
+        self.colors: torch.Tensor = data["colors"]
+        self.pre_act_opacities: torch.Tensor = data["pre_act_opacities"]
 
         # [Q 1.3.1] NOTE: Uncomment spherical harmonics code for question 1.3.1
         # if data.get("spherical_harmonics") is not None:
