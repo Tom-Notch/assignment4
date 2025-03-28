@@ -373,4 +373,5 @@ def colors_from_spherical_harmonics(
 
     basis = generate_sh_basis(gaussian_dirs)
     colors = (_spherical_harmonics * basis.unsqueeze(1)).sum(dim=-1)
+    colors = torch.clamp(colors + 0.5, 0.0, 1.0)
     return colors
